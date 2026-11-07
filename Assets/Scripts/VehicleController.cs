@@ -1,10 +1,11 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-// Basic hull: car-like movement driven by a single direction input.
+// Basic hull (3D version): car-like movement on the ground plane (X/Z).
+// The nose of the hull is local +Z. Stick up = world +Z (screen up), stick right = world +X.
 // The hull can only turn while it is rolling. It prefers driving forward: it only
 // reverses when the stick points inside a narrow cone straight behind the hull.
-[RequireComponent(typeof(Rigidbody2D))]
+[RequireComponent(typeof(Rigidbody))]
 public class VehicleController : MonoBehaviour
 {
     [Header("Movement (tune these)")]
@@ -28,12 +29,25 @@ public class VehicleController : MonoBehaviour
     // Final input used by the physics (length 0..1): the stick, or WASD as an editor fallback.
     public Vector2 MoveInput { get; set; }
 
-    Rigidbody2D rb;
+    Rigidbody rb;
+    float yaw;          // our own heading in degrees (0 = facing +Z). Collisions can't change it.
     bool reversing;
 
     void Awake()
     {
-        rb = GetComponent<Rigidbody2D>();
+        rb = GetComponent<Rigidbody>();
+
+        // Set here so you don't have to configure the Rigidbody by hand.
+        rb.useGravity = false;
+        rb.constraints = RigidbodyConstraints.FreezePositionY
+                       | RigidbodyConstraints.FreezeRotationX
+                       | RigidbodyConstraints.FreezeRotationZ;
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
+        rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+        rb.linearDamping = 0f;
+        rb.angularDamping = 0f;
+
+        yaw = transform.eulerAngles.y;
     }
 
     void Update()
@@ -63,25 +77,31 @@ public class VehicleController : MonoBehaviour
         return v.normalized;
     }
 
+    static Vector3 Forward(float yawDegrees)
+    {
+        float r = yawDegrees * Mathf.Deg2Rad;
+        return new Vector3(Mathf.Sin(r), 0f, Mathf.Cos(r));
+    }
+
     void FixedUpdate()
     {
         float dt = Time.fixedDeltaTime;
         float mag = Mathf.Clamp01(MoveInput.magnitude);
-        float angle = rb.rotation;
 
         // Current speed along the facing direction (before turning this step).
-        float rad = angle * Mathf.Deg2Rad;
-        Vector2 forward = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
-        float currentFwdSpeed = Vector2.Dot(rb.linearVelocity, forward);
+        Vector3 forward = Forward(yaw);
+        Vector3 vel = rb.linearVelocity;
+        float currentFwdSpeed = Vector3.Dot(vel, forward);
 
         float targetSpeed = 0f;
 
         if (mag > 0.01f)
         {
-            float targetAngle = Mathf.Atan2(MoveInput.y, MoveInput.x) * Mathf.Rad2Deg;
-            float deltaFwd = Mathf.Abs(Mathf.DeltaAngle(angle, targetAngle));
+            // Direction the stick points, as a heading (0 = +Z, 90 = +X).
+            float targetYaw = Mathf.Atan2(MoveInput.x, MoveInput.y) * Mathf.Rad2Deg;
+            float deltaFwd = Mathf.Abs(Mathf.DeltaAngle(yaw, targetYaw));
 
-            // Decide: reverse only if the stick points inside the cone straight behind the hull,
+            // Reverse only if the stick points inside the cone straight behind the hull,
             // otherwise always drive forward (so a stand-still turn goes forward on both sides).
             // The margin only applies while rolling, so a fresh push from a stop decides cleanly.
             float reverseThreshold = 180f - reverseConeAngle * 0.5f;
@@ -90,13 +110,12 @@ public class VehicleController : MonoBehaviour
             else if (reversing && deltaFwd < reverseThreshold - margin) reversing = false;
 
             // When reversing, the BACK of the hull should point at the stick direction.
-            float desiredAngle = reversing ? targetAngle + 180f : targetAngle;
-            float delta = Mathf.DeltaAngle(angle, desiredAngle);
+            float desiredYaw = reversing ? targetYaw + 180f : targetYaw;
+            float delta = Mathf.DeltaAngle(yaw, desiredYaw);
 
             // Turn only as much as we are rolling: no speed, no turning.
             float turnFactor = Mathf.Clamp01(Mathf.Abs(currentFwdSpeed) / fullTurnSpeed);
-            angle = Mathf.MoveTowardsAngle(angle, desiredAngle, turnSpeed * turnFactor * dt);
-            rb.MoveRotation(angle);
+            yaw = Mathf.MoveTowardsAngle(yaw, desiredYaw, turnSpeed * turnFactor * dt);
 
             // Throttle: full when aligned, never below minDrive so it can always start moving and turn.
             float alignment = Mathf.Max(minDrive, Mathf.Cos(delta * Mathf.Deg2Rad));
@@ -104,14 +123,17 @@ public class VehicleController : MonoBehaviour
             targetSpeed = topSpeed * mag * alignment;
         }
 
-        // Forward (+X of the hull) and side directions from the new angle.
-        rad = angle * Mathf.Deg2Rad;
-        forward = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
-        Vector2 side = new Vector2(-forward.y, forward.x);
+        // Apply our heading and ignore any spin that collisions tried to add.
+        rb.MoveRotation(Quaternion.Euler(0f, yaw, 0f));
+        rb.angularVelocity = Vector3.zero;
 
-        Vector2 vel = rb.linearVelocity;
-        float fwdSpeed = Vector2.Dot(vel, forward);
-        float sideSpeed = Vector2.Dot(vel, side);
+        // Forward and side directions from the new heading (side = right-hand side seen from above).
+        forward = Forward(yaw);
+        Vector3 side = new Vector3(forward.z, 0f, -forward.x);
+
+        Vector3 flat = new Vector3(vel.x, 0f, vel.z);
+        float fwdSpeed = Vector3.Dot(flat, forward);
+        float sideSpeed = Vector3.Dot(flat, side);
 
         // Accelerate or brake along the facing direction, and bleed off sideways slide.
         fwdSpeed = Mathf.MoveTowards(fwdSpeed, targetSpeed, acceleration * dt);

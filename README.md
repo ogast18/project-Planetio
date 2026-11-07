@@ -12,7 +12,7 @@ The **demo** is a solo project made to experiment and understand how the systems
 - **Platform:** Android first, iOS maybe later
 - **Orientation:** Landscape (lots of action on screen)
 - **Team:** Everything is made by one person for now
-- **Perspective:** 2D, camera straight above the vehicle
+- **Perspective:** 3D, camera diagonal, above the vehicle
 - **Art style:** Realistic environment with a cartoon look
 
 ## Plot
