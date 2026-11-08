@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 [CreateAssetMenu(fileName = "NewTurret", menuName = "Planetio/Turret Stats")]
 public class TurretStats : ScriptableObject
@@ -8,14 +9,23 @@ public class TurretStats : ScriptableObject
 
     [Header("Base stats (level 1)")]
     [Min(0)] public float baseDamage = 25f;
-    [Min(0.1f)] public float shotsPerSecond = 1.5f;
-    [Range(0f, 1f)] public float armorPenetration = 0f;
+    [FormerlySerializedAs("shotsPerSecond"), Min(0.1f)] public float fireRate = 1.5f;   // shots per second
+    [FormerlySerializedAs("bulletSpeed"), Min(1)] public float projectileSpeed = 18f;  // units per second
     [Min(1)] public float range = 12f;
-    [Range(1f, 180f)] public float coneAngle = 30f;
-    [Range(0.1f, 1f), Tooltip("Cone multiplier while the vehicle stands still")]
-    public float standingConeFactor = 0.6f;
-    [Min(1)] public float bulletSpeed = 25f;
-    [Min(1)] public float turnSpeed = 270f;
+    [Range(1f, 360f)] public float coneAngle = 30f;    // total width while moving, in degrees
+    [Range(0f, 1f)] public float armorPenetration = 0f; // not used yet
+    [Min(1)] public float turnSpeed = 270f;            // degrees per second
+
+    [Header("Accuracy")]
+    [Range(0f, 1f), Tooltip("1 = bullets can go anywhere in the cone, 0 = always straight")]
+    public float spreadAmount = 1f;
+
+    [Header("Aim improves when standing still")]
+    [FormerlySerializedAs("standingConeFactor"), Range(0.1f, 1f)]
+    public float stationaryConeMultiplier = 0.6f;
+    public float stationarySpeed = 0.3f;   // below this speed the vehicle counts as still
+    public float settleTime = 0.5f;        // seconds to fully tighten after stopping
+    public float loosenTime = 0.15f;       // seconds to widen again once moving
 
     [Header("Damage growth")]
     [Tooltip("X = level (1-30), Y = damage multiplier (1 = base damage)")]
@@ -41,8 +51,8 @@ public class TurretStats : ScriptableObject
     // What the turret actually uses at a given level
     public struct Resolved
     {
-        public float damage, shotsPerSecond, armorPenetration, range,
-                     coneAngle, standingConeFactor, bulletSpeed, turnSpeed;
+        public float damage, fireRate, projectileSpeed, range, coneAngle, armorPenetration, turnSpeed,
+                     spreadAmount, stationaryConeMultiplier, stationarySpeed, settleTime, loosenTime;
     }
 
     public Resolved AtLevel(int level)
@@ -52,13 +62,17 @@ public class TurretStats : ScriptableObject
         var r = new Resolved
         {
             damage = baseDamage * damageMultiplier.Evaluate(level),
-            shotsPerSecond = shotsPerSecond,
-            armorPenetration = armorPenetration,
+            fireRate = fireRate,
+            projectileSpeed = projectileSpeed,
             range = range,
             coneAngle = coneAngle,
-            standingConeFactor = standingConeFactor,
-            bulletSpeed = bulletSpeed,
-            turnSpeed = turnSpeed
+            armorPenetration = armorPenetration,
+            turnSpeed = turnSpeed,
+            spreadAmount = spreadAmount,
+            stationaryConeMultiplier = stationaryConeMultiplier,
+            stationarySpeed = stationarySpeed,
+            settleTime = settleTime,
+            loosenTime = loosenTime
         };
 
         foreach (var m in milestones)
@@ -66,7 +80,7 @@ public class TurretStats : ScriptableObject
             if (level < m.level) continue;
             r.range += m.rangeBonus;
             r.coneAngle *= m.coneAngleMultiplier;
-            r.shotsPerSecond *= m.fireRateMultiplier;
+            r.fireRate *= m.fireRateMultiplier;
         }
         return r;
     }

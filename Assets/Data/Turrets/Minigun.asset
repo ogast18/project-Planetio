@@ -12,11 +12,52 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8900ef13784424243b8a7fa1125315f8, type: 3}
   m_Name: Minigun
   m_EditorClassIdentifier: Assembly-CSharp::TurretStats
-  damage: 25
-  shotsPerSecond: 1.5
-  armorPenetration: 0
+  baseDamage: 25
+  fireRate: 12
+  projectileSpeed: 35
   range: 12
-  coneAngle: 30
-  standingConeFactor: 0.5
-  bulletSpeed: 25
-  turnSpeed: 270
+  coneAngle: 15
+  armorPenetration: 0
+  turnSpeed: 230
+  spreadAmount: 1
+  stationaryConeMultiplier: 0.5
+  stationarySpeed: 0.3
+  settleTime: 0.5
+  loosenTime: 0.15
+  damageMultiplier:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0.06896552
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 30
+      value: 3
+      inSlope: 0.06896552
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  milestones:
+  - level: 10
+    rangeBonus: 1.5
+    coneAngleMultiplier: 1
+    fireRateMultiplier: 1
+  - level: 20
+    rangeBonus: 0
+    coneAngleMultiplier: 0.85
+    fireRateMultiplier: 1
+  - level: 30
+    rangeBonus: 1.5
+    coneAngleMultiplier: 0.85
+    fireRateMultiplier: 1

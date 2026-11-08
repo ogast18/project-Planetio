@@ -5,7 +5,8 @@ using UnityEngine;
 // Every bullet flies at a random angle inside the cone, and the cone gets narrower
 // (so aim gets better) while the vehicle stands still.
 // Holding the fire button fires even when there is no target (for shooting walls).
-// Put this on the same Turret object as TurretController.
+// Put this on the same Turret object as TurretController. All numbers come from its TurretStats.
+[RequireComponent(typeof(TurretController))]                       // STATS
 public class TurretWeapon : MonoBehaviour
 {
     [Header("References")]
@@ -14,25 +15,8 @@ public class TurretWeapon : MonoBehaviour
     public Material coneMaterial;          // transparent material for the cone display (optional)
     public FireButton fireButton;          // optional: found automatically if left empty
 
-    [Header("Cannon (tune these)")]
+    [Header("Setup")]
     public Team team = Team.Player;
-    public float damage = 25f;
-    public float fireRate = 1.5f;          // shots per second
-    public float projectileSpeed = 18f;    // units per second
-    public float range = 12f;              // how far it shoots and how long the cone is
-    [Range(1f, 360f)]
-    public float coneAngle = 30f;          // total width of the firing cone while moving, in degrees
-
-    [Header("Accuracy")]
-    [Range(0f, 1f)]
-    public float spreadAmount = 1f;        // 1 = bullets can go anywhere inside the cone, 0 = always straight ahead
-
-    [Header("Aim improves when standing still")]
-    [Range(0.1f, 1f)]
-    public float stationaryConeMultiplier = 0.6f; // cone width when fully settled, as a fraction of coneAngle
-    public float stationarySpeed = 0.3f;   // below this speed the vehicle counts as standing still
-    public float settleTime = 0.5f;        // seconds to fully tighten after stopping
-    public float loosenTime = 0.15f;       // seconds to widen again once moving
 
     [Header("Walls")]
     public float coneSegmentAngle = 3f;    // degrees per cone slice: smaller = smoother cut at walls, more raycasts
@@ -44,6 +28,8 @@ public class TurretWeapon : MonoBehaviour
     // The cone width right now (between the moving and the settled width).
     public float CurrentConeAngle { get; private set; }
 
+    TurretController controller;           // STATS
+    TurretStats.Resolved s;                // STATS: this frame's stats (level applied)
     float cooldown;
     float sharpness;                       // 0 = moving (full cone), 1 = fully settled
     Rigidbody body;
@@ -56,14 +42,25 @@ public class TurretWeapon : MonoBehaviour
 
     void Start()
     {
+        controller = GetComponent<TurretController>();             // STATS
         body = GetComponentInParent<Rigidbody>();   // the vehicle's Rigidbody
         if (fireButton == null) fireButton = FindFirstObjectByType<FireButton>();
-        CurrentConeAngle = coneAngle;
+
+        if (controller.stats == null)                              // STATS
+        {
+            Debug.LogError("TurretWeapon: TurretController has no TurretStats assigned.", this);
+            enabled = false;
+            return;
+        }
+
+        s = controller.Current;                                    // STATS
+        CurrentConeAngle = s.coneAngle;                            // STATS
         RefreshCone();
     }
 
     void Update()
     {
+        s = controller.Current;                                    // STATS: read once per frame
         UpdateConeAngle();
 
         cooldown = Mathf.Max(0f, cooldown - Time.deltaTime);
@@ -74,7 +71,7 @@ public class TurretWeapon : MonoBehaviour
             if (manual || HasTargetInCone())
             {
                 Fire();
-                cooldown = 1f / Mathf.Max(0.01f, fireRate);
+                cooldown = 1f / Mathf.Max(0.01f, s.fireRate);      // STATS
             }
         }
 
@@ -83,13 +80,13 @@ public class TurretWeapon : MonoBehaviour
 
     void UpdateConeAngle()
     {
-        bool still = body != null && body.linearVelocity.magnitude < stationarySpeed;
+        bool still = body != null && body.linearVelocity.magnitude < s.stationarySpeed;     // STATS
 
         float dt = Time.deltaTime;
-        if (still) sharpness = Mathf.MoveTowards(sharpness, 1f, dt / Mathf.Max(0.01f, settleTime));
-        else sharpness = Mathf.MoveTowards(sharpness, 0f, dt / Mathf.Max(0.01f, loosenTime));
+        if (still) sharpness = Mathf.MoveTowards(sharpness, 1f, dt / Mathf.Max(0.01f, s.settleTime));   // STATS
+        else sharpness = Mathf.MoveTowards(sharpness, 0f, dt / Mathf.Max(0.01f, s.loosenTime));         // STATS
 
-        CurrentConeAngle = Mathf.Lerp(coneAngle, coneAngle * stationaryConeMultiplier, sharpness);
+        CurrentConeAngle = Mathf.Lerp(s.coneAngle, s.coneAngle * s.stationaryConeMultiplier, sharpness); // STATS
     }
 
     // ---- Walls -------------------------------------------------------------
@@ -133,7 +130,7 @@ public class TurretWeapon : MonoBehaviour
     float ClipDistance(Vector3 origin, Vector3 flatForward, float yawOffset)
     {
         Vector3 dir = Quaternion.Euler(0f, yawOffset, 0f) * flatForward;
-        return WallDistance(origin, dir, range);
+        return WallDistance(origin, dir, s.range);                 // STATS
     }
 
     // True if anything a bullet could hit (wall, obstacle, enemy) is within a short distance ahead.
@@ -170,7 +167,7 @@ public class TurretWeapon : MonoBehaviour
             Vector3 to = h.transform.position - transform.position;
             to.y = 0f;
             float dist = to.magnitude;
-            if (dist - h.radius > range) continue;
+            if (dist - h.radius > s.range) continue;               // STATS
 
             // Counts as inside if any part of the target (its radius) touches the cone.
             float signed = Vector3.SignedAngle(forward, to, Vector3.up);
@@ -191,7 +188,7 @@ public class TurretWeapon : MonoBehaviour
         if (projectilePrefab == null || muzzle == null) return;
 
         // Random direction inside the cone.
-        float half = CurrentConeAngle * 0.5f * spreadAmount;
+        float half = CurrentConeAngle * 0.5f * s.spreadAmount;     // STATS
         Vector3 dir = Quaternion.Euler(0f, Random.Range(-half, half), 0f) * FlatForward();
 
         // If a wall or an enemy sits between the turret centre and the muzzle (pressed up against it),
@@ -202,7 +199,7 @@ public class TurretWeapon : MonoBehaviour
         if (SolidAhead(origin, dir, toMuzzle + 0.2f)) spawn = origin;
 
         Projectile p = Instantiate(projectilePrefab, spawn, Quaternion.LookRotation(dir));
-        p.Launch(dir, projectileSpeed, damage, range, team, body);
+        p.Launch(dir, s.projectileSpeed, s.damage, s.range, team, body);   // STATS
     }
 
     // ---- Cone display ------------------------------------------------------
