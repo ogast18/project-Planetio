@@ -53,6 +53,18 @@ public class Health : MonoBehaviour
         if (showBar) WorldUI.Instance.AddBar(this);
     }
 
+    // Called by a stats asset (hull, later enemies) to set max health and armor.
+    // Keeps the same health percentage, so leveling up mid-fight doesn't heal or hurt.
+    public void Configure(float newMaxHealth, float newArmorPercent)
+    {
+        armorPercent = Mathf.Clamp(newArmorPercent, 0f, 90f);
+        if (Mathf.Approximately(newMaxHealth, maxHealth)) return;
+
+        float ratio = maxHealth > 0f ? Current / maxHealth : 1f;
+        maxHealth = newMaxHealth;
+        Current = Mathf.Min(maxHealth, ratio * maxHealth);
+    }
+
     // hitDirection and knockback are optional: TakeDamage(10) still works, with no push.
     public void TakeDamage(float amount, Vector3 hitDirection = default, float knockback = 0f)
     {

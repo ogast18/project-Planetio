@@ -5,23 +5,13 @@ using UnityEngine.InputSystem;
 // The nose of the hull is local +Z. Stick up = world +Z (screen up), stick right = world +X.
 // The hull can only turn while it is rolling. It prefers driving forward: it only
 // reverses when the stick points inside a narrow cone straight behind the hull.
+// All numbers (movement, health, armor) come from the HullStats asset at the chosen level.
 [RequireComponent(typeof(Rigidbody))]
 public class VehicleController : MonoBehaviour
 {
-    [Header("Movement (tune these)")]
-    public float maxSpeed = 6f;          // forward top speed, units per second
-    public float maxReverseSpeed = 3.5f; // reverse top speed
-    public float acceleration = 14f;     // how fast it speeds up and brakes
-    public float turnSpeed = 220f;       // degrees per second at full turn rate
-    public float sideGrip = 8f;          // higher = less drifting
-
-    [Header("Turning needs movement")]
-    public float fullTurnSpeed = 2f;     // speed at which it turns at the full rate (0 speed = no turning)
-    public float minDrive = 0.35f;       // minimum throttle when the target is not in front, so it can start turning
-
-    [Header("Forward / reverse choice")]
-    public float reverseConeAngle = 90f;    // total width of the cone straight behind the hull that triggers reverse
-    public float reverseSwitchMargin = 12f; // degrees of hysteresis, stops flicking between forward and reverse at the cone edge
+    [Header("Stats")]
+    public HullStats stats;              // drag the hull's stats asset here (e.g. BasicHull)
+    [Range(1, HullStats.MaxLevel)] public int level = 1;
 
     [Header("Input")]
     public VirtualStick moveStick;       // drag the MoveZone object here
@@ -30,12 +20,15 @@ public class VehicleController : MonoBehaviour
     public Vector2 MoveInput { get; set; }
 
     Rigidbody rb;
+    Health health;
+    HullStats.Resolved h;   // this frame's stats (level applied)
     float yaw;          // our own heading in degrees (0 = facing +Z). Collisions can't change it.
     bool reversing;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        health = GetComponent<Health>();
 
         // Set here so you don't have to configure the Rigidbody by hand.
         rb.useGravity = false;
@@ -48,11 +41,24 @@ public class VehicleController : MonoBehaviour
         rb.angularDamping = 0f;
 
         yaw = transform.eulerAngles.y;
+
+        if (stats == null)
+            Debug.LogError("VehicleController has no HullStats assigned, so the vehicle cannot move.", this);
+        RefreshStats();
     }
 
     void Update()
     {
+        RefreshStats();   // every frame, so changing the level or the asset in Play Mode is live
         ReadInput();
+    }
+
+    // Reads the stats for the current level and gives the Health its max health and armor.
+    void RefreshStats()
+    {
+        if (stats == null) return;
+        h = stats.AtLevel(level);
+        if (health != null) health.Configure(h.maxHealth, h.armorPercent);
     }
 
     // The move stick wins when touched; WASD / arrow keys stay as an editor fallback.
@@ -85,6 +91,8 @@ public class VehicleController : MonoBehaviour
 
     void FixedUpdate()
     {
+        if (stats == null) return;
+
         float dt = Time.fixedDeltaTime;
         float mag = Mathf.Clamp01(MoveInput.magnitude);
 
@@ -104,8 +112,8 @@ public class VehicleController : MonoBehaviour
             // Reverse only if the stick points inside the cone straight behind the hull,
             // otherwise always drive forward (so a stand-still turn goes forward on both sides).
             // The margin only applies while rolling, so a fresh push from a stop decides cleanly.
-            float reverseThreshold = 180f - reverseConeAngle * 0.5f;
-            float margin = Mathf.Abs(currentFwdSpeed) > 1f ? reverseSwitchMargin : 0f;
+            float reverseThreshold = 180f - h.reverseConeAngle * 0.5f;
+            float margin = Mathf.Abs(currentFwdSpeed) > 1f ? h.reverseSwitchMargin : 0f;
             if (!reversing && deltaFwd > reverseThreshold + margin) reversing = true;
             else if (reversing && deltaFwd < reverseThreshold - margin) reversing = false;
 
@@ -114,12 +122,12 @@ public class VehicleController : MonoBehaviour
             float delta = Mathf.DeltaAngle(yaw, desiredYaw);
 
             // Turn only as much as we are rolling: no speed, no turning.
-            float turnFactor = Mathf.Clamp01(Mathf.Abs(currentFwdSpeed) / fullTurnSpeed);
-            yaw = Mathf.MoveTowardsAngle(yaw, desiredYaw, turnSpeed * turnFactor * dt);
+            float turnFactor = Mathf.Clamp01(Mathf.Abs(currentFwdSpeed) / h.fullTurnSpeed);
+            yaw = Mathf.MoveTowardsAngle(yaw, desiredYaw, h.turnSpeed * turnFactor * dt);
 
             // Throttle: full when aligned, never below minDrive so it can always start moving and turn.
-            float alignment = Mathf.Max(minDrive, Mathf.Cos(delta * Mathf.Deg2Rad));
-            float topSpeed = reversing ? -maxReverseSpeed : maxSpeed;
+            float alignment = Mathf.Max(h.minDrive, Mathf.Cos(delta * Mathf.Deg2Rad));
+            float topSpeed = reversing ? -h.maxReverseSpeed : h.maxSpeed;
             targetSpeed = topSpeed * mag * alignment;
         }
 
@@ -136,8 +144,8 @@ public class VehicleController : MonoBehaviour
         float sideSpeed = Vector3.Dot(flat, side);
 
         // Accelerate or brake along the facing direction, and bleed off sideways slide.
-        fwdSpeed = Mathf.MoveTowards(fwdSpeed, targetSpeed, acceleration * dt);
-        sideSpeed = Mathf.Lerp(sideSpeed, 0f, sideGrip * dt);
+        fwdSpeed = Mathf.MoveTowards(fwdSpeed, targetSpeed, h.acceleration * dt);
+        sideSpeed = Mathf.Lerp(sideSpeed, 0f, h.sideGrip * dt);
 
         rb.linearVelocity = forward * fwdSpeed + side * sideSpeed;
     }

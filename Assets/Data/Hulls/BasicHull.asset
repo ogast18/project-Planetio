@@ -1,0 +1,65 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 103de3064939cc142b663f4dac27344b, type: 3}
+  m_Name: BasicHull
+  m_EditorClassIdentifier: Assembly-CSharp::HullStats
+  baseHealth: 100
+  armorPercent: 0
+  maxSpeed: 6
+  maxReverseSpeed: 3.5
+  acceleration: 14
+  turnSpeed: 220
+  sideGrip: 8
+  fullTurnSpeed: 2
+  minDrive: 0.35
+  reverseConeAngle: 90
+  reverseSwitchMargin: 12
+  healthMultiplier:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0.06896552
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 30
+      value: 3
+      inSlope: 0.06896552
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  milestones:
+  - level: 10
+    armorBonus: 0
+    speedMultiplier: 1.1
+    accelerationMultiplier: 1
+    turnSpeedMultiplier: 1
+  - level: 20
+    armorBonus: 5
+    speedMultiplier: 1
+    accelerationMultiplier: 1
+    turnSpeedMultiplier: 1
+  - level: 30
+    armorBonus: 0
+    speedMultiplier: 1.1
+    accelerationMultiplier: 1
+    turnSpeedMultiplier: 1.1
