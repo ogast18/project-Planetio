@@ -1,15 +1,22 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// Spawns enemies over time so you always have something to test against.
+// Spawns enemies over time. Spawns a fixed number in total (then the level can be won),
+// or keeps going forever if Total Enemies is 0.
 // Put this on an empty object on the far side of the map from the base.
 public class EnemySpawner : MonoBehaviour
 {
+    public static readonly List<EnemySpawner> All = new List<EnemySpawner>();
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatics() { All.Clear(); }
+
     [Header("References")]
     public GameObject enemyPrefab;          // drag the Enemy prefab here
     public Transform[] spawnPoints;         // optional: if empty, it spawns around this object
 
     [Header("Spawning (tune these)")]
+    public int totalEnemies = 15;           // how many it spawns in total (0 = endless, no victory)
     public float firstDelay = 2f;           // seconds before the first enemy
     public float interval = 4f;             // seconds between enemies
     public int maxAlive = 5;                // it waits when this many of its enemies are alive
@@ -17,6 +24,28 @@ public class EnemySpawner : MonoBehaviour
 
     readonly List<GameObject> spawned = new List<GameObject>();
     float timer;
+    int spawnedTotal;
+
+    // Enemies of this spawner that are alive right now.
+    public int Alive
+    {
+        get { Prune(); return spawned.Count; }
+    }
+
+    // Enemies still to be defeated: not spawned yet plus alive (0 when endless).
+    public int Remaining
+    {
+        get { return totalEnemies > 0 ? (totalEnemies - spawnedTotal) + Alive : 0; }
+    }
+
+    // Everything has been spawned and defeated.
+    public bool IsFinished
+    {
+        get { return totalEnemies > 0 && spawnedTotal >= totalEnemies && Alive == 0; }
+    }
+
+    void OnEnable() { All.Add(this); }
+    void OnDisable() { All.Remove(this); }
 
     void Start()
     {
@@ -28,18 +57,24 @@ public class EnemySpawner : MonoBehaviour
 
     void Update()
     {
+        if (totalEnemies > 0 && spawnedTotal >= totalEnemies) return;   // all spawned
+
         timer -= Time.deltaTime;
         if (timer > 0f) return;
 
-        // Forget enemies that have died.
-        for (int i = spawned.Count - 1; i >= 0; i--)
-            if (spawned[i] == null) spawned.RemoveAt(i);
-
         // Full: keep waiting, and spawn as soon as there is room.
+        Prune();
         if (spawned.Count >= maxAlive) return;
 
         Spawn();
         timer = interval;
+    }
+
+    // Forget enemies that have died.
+    void Prune()
+    {
+        for (int i = spawned.Count - 1; i >= 0; i--)
+            if (spawned[i] == null) spawned.RemoveAt(i);
     }
 
     void Spawn()
@@ -56,5 +91,6 @@ public class EnemySpawner : MonoBehaviour
                                   p.position.z + offset.y);
 
         spawned.Add(Instantiate(enemyPrefab, pos, Quaternion.identity));
+        spawnedTotal++;
     }
 }
