@@ -5,7 +5,7 @@ using UnityEngine;
 public class PerformanceSettings : MonoBehaviour
 {
     // Change these two lines to taste.
-    const int TargetFps = 60;          // try 90 or 120 on high refresh rate phones
+    const int TargetFps = 120;          // try 90 or 120 on high refresh rate phones
     const bool ShowFps = true;         // set to false when you no longer want the counter
 
     float smoothDelta = 1f / 60f;
