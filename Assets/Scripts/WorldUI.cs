@@ -5,6 +5,8 @@ using UnityEngine.UI;
 // Draws health bars and floating damage numbers over objects in the world.
 // It creates its own overlay canvas the first time something needs it, so there is nothing to set up.
 // Everything is drawn behind your sticks and never blocks touches.
+// Built to be cheap on phones: bars and numbers live on separate sub-canvases (so moving numbers
+// never force the bars to rebuild), numbers are pooled, and values are only written when they change.
 public class WorldUI : MonoBehaviour
 {
     static WorldUI instance;
@@ -43,6 +45,9 @@ public class WorldUI : MonoBehaviour
         public Health health;
         public RectTransform root;
         public RectTransform fill;
+        public float lastRatio = -1f;
+        public Vector2 lastPos = new Vector2(-99999f, -99999f);
+        public bool shown = true;
     }
 
     class Floating
@@ -54,13 +59,14 @@ public class WorldUI : MonoBehaviour
         public float age;
         public RectTransform rect;
         public Text text;
-        public Color baseColor;
     }
 
     readonly List<Bar> bars = new List<Bar>();
     readonly List<Floating> floats = new List<Floating>();
+    readonly Stack<Floating> pool = new Stack<Floating>();
 
     Canvas canvas;
+    RectTransform barsLayer, numbersLayer;
     Camera cam;
     Font font;
 
@@ -78,6 +84,10 @@ public class WorldUI : MonoBehaviour
         scaler.matchWidthOrHeight = 0.5f;
 
         font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+        // Separate sub-canvases rebuild independently of each other.
+        barsLayer = NewLayer("Bars");
+        numbersLayer = NewLayer("Numbers");
     }
 
     // ---- Health bars -----------------------------------------------------
@@ -85,7 +95,7 @@ public class WorldUI : MonoBehaviour
     public void AddBar(Health h)
     {
         var root = new GameObject("HealthBar", typeof(RectTransform));
-        root.transform.SetParent(transform, false);
+        root.transform.SetParent(barsLayer, false);
         var rt = (RectTransform)root.transform;
         rt.sizeDelta = new Vector2(h.barWidth, barHeight);
 
@@ -108,8 +118,26 @@ public class WorldUI : MonoBehaviour
     {
         if (h == null) return;
 
+        Floating f = pool.Count > 0 ? pool.Pop() : CreateFloating();
+
+        f.owner = h;
+        f.lastPos = h.transform.position;
+        f.startOffset = h.barOffset + 32f;               // starts just above the health bar
+        f.xJitter = Random.Range(-18f, 18f);             // so numbers from fast hits don't sit exactly on top of each other
+        f.age = 0f;
+
+        f.text.text = "-" + (amount >= 1f ? Mathf.RoundToInt(amount).ToString() : amount.ToString("0.#"));
+        f.text.color = h.team == Team.Enemy ? damageToEnemyColor : damageToAllyColor;
+        f.text.canvasRenderer.SetAlpha(1f);
+        f.rect.gameObject.SetActive(true);
+
+        floats.Add(f);
+    }
+
+    Floating CreateFloating()
+    {
         var go = new GameObject("DamageText", typeof(RectTransform));
-        go.transform.SetParent(transform, false);
+        go.transform.SetParent(numbersLayer, false);
         var rt = (RectTransform)go.transform;
         rt.sizeDelta = new Vector2(240f, 70f);
 
@@ -120,26 +148,14 @@ public class WorldUI : MonoBehaviour
         text.alignment = TextAnchor.MiddleCenter;
         text.horizontalOverflow = HorizontalWrapMode.Overflow;
         text.verticalOverflow = VerticalWrapMode.Overflow;
+        text.supportRichText = false;
         text.raycastTarget = false;
-        text.text = "-" + (amount >= 1f ? Mathf.RoundToInt(amount).ToString() : amount.ToString("0.#"));
-
-        Color c = h.team == Team.Enemy ? damageToEnemyColor : damageToAllyColor;
-        text.color = c;
 
         var outline = go.AddComponent<Outline>();
         outline.effectColor = new Color(0f, 0f, 0f, 0.85f);
         outline.effectDistance = new Vector2(2f, -2f);
 
-        floats.Add(new Floating
-        {
-            owner = h,
-            lastPos = h.transform.position,
-            startOffset = h.barOffset + 32f,            // starts just above the health bar
-            xJitter = Random.Range(-18f, 18f),          // so numbers from fast hits don't sit exactly on top of each other
-            rect = rt,
-            text = text,
-            baseColor = c
-        });
+        return new Floating { rect = rt, text = text };
     }
 
     // ---- Per-frame update ------------------------------------------------
@@ -163,14 +179,28 @@ public class WorldUI : MonoBehaviour
 
             Vector3 sp = cam.WorldToScreenPoint(b.health.transform.position);
             bool visible = sp.z > 0f;
-            b.root.gameObject.SetActive(visible);
+            if (visible != b.shown)
+            {
+                b.shown = visible;
+                b.root.gameObject.SetActive(visible);
+            }
             if (!visible) continue;
 
-            b.root.position = new Vector3(sp.x, sp.y + b.health.barOffset * s, 0f);
+            // Only touch the UI when something actually changed.
+            Vector2 p = new Vector2(sp.x, sp.y + b.health.barOffset * s);
+            if ((p - b.lastPos).sqrMagnitude > 0.01f)
+            {
+                b.lastPos = p;
+                b.root.position = new Vector3(p.x, p.y, 0f);
+            }
 
             float ratio = b.health.maxHealth > 0f ? b.health.Current / b.health.maxHealth : 0f;
-            b.fill.anchorMax = new Vector2(Mathf.Clamp01(ratio), 1f);
-            b.fill.gameObject.SetActive(ratio > 0.03f);
+            if (!Mathf.Approximately(ratio, b.lastRatio))
+            {
+                b.lastRatio = ratio;
+                b.fill.anchorMax = new Vector2(Mathf.Clamp01(ratio), 1f);
+                b.fill.gameObject.SetActive(ratio > 0.03f);
+            }
         }
 
         for (int i = floats.Count - 1; i >= 0; i--)
@@ -181,7 +211,8 @@ public class WorldUI : MonoBehaviour
 
             if (t >= 1f)
             {
-                Destroy(f.rect.gameObject);
+                f.rect.gameObject.SetActive(false);
+                pool.Push(f);
                 floats.RemoveAt(i);
                 continue;
             }
@@ -196,13 +227,21 @@ public class WorldUI : MonoBehaviour
             float rise = riseDistance * eased;
             f.rect.position = new Vector3(sp.x + f.xJitter * s, sp.y + (f.startOffset + rise) * s, 0f);
 
-            Color c = f.baseColor;
-            c.a = t < 0.5f ? 1f : 1f - (t - 0.5f) / 0.5f;           // fade out in the second half
-            f.text.color = c;
+            // CanvasRenderer alpha is much cheaper than changing the text colour every frame.
+            f.text.canvasRenderer.SetAlpha(t < 0.5f ? 1f : 1f - (t - 0.5f) / 0.5f);
         }
     }
 
     // ---- Helpers ---------------------------------------------------------
+
+    RectTransform NewLayer(string name)
+    {
+        var go = new GameObject(name, typeof(RectTransform), typeof(Canvas));
+        go.transform.SetParent(transform, false);
+        var rt = (RectTransform)go.transform;
+        Stretch(rt);
+        return rt;
+    }
 
     static Image NewImage(string name, RectTransform parent, Color color)
     {

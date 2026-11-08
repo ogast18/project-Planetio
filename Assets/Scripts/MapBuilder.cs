@@ -88,8 +88,14 @@ public class MapBuilder : MonoBehaviour
         go.transform.SetParent(transform, false);
         go.transform.localPosition = pos;
         go.transform.localScale = scale;
-        go.GetComponent<Renderer>().sharedMaterial = mat;
-        if (!keepCollider) Destroy(go.GetComponent<Collider>());
+        var r = go.GetComponent<Renderer>();
+        r.sharedMaterial = mat;
+        if (!keepCollider)
+        {
+            // Grid lines are only decoration: no collider, and no cost in the shadow pass.
+            Destroy(go.GetComponent<Collider>());
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
         return go;
     }
 }

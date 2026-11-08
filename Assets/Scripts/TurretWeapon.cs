@@ -35,7 +35,7 @@ public class TurretWeapon : MonoBehaviour
     public float loosenTime = 0.15f;       // seconds to widen again once moving
 
     [Header("Walls")]
-    public float coneSegmentAngle = 2f;    // degrees per cone slice: smaller = smoother cut at walls, more raycasts
+    public float coneSegmentAngle = 3f;    // degrees per cone slice: smaller = smoother cut at walls, more raycasts
 
     [Header("Cone display")]
     public bool showCone = true;
@@ -136,6 +136,25 @@ public class TurretWeapon : MonoBehaviour
         return WallDistance(origin, dir, range);
     }
 
+    // True if anything a bullet could hit (wall, obstacle, enemy) is within a short distance ahead.
+    // Our own vehicle and friendly things don't count.
+    bool SolidAhead(Vector3 origin, Vector3 dir, float maxDistance)
+    {
+        int n = Physics.RaycastNonAlloc(origin, dir, hitBuffer, maxDistance, ~0, QueryTriggerInteraction.Ignore);
+
+        for (int i = 0; i < n; i++)
+        {
+            Collider c = hitBuffer[i].collider;
+            if (body != null && c.attachedRigidbody == body) continue;
+
+            Health h = c.GetComponentInParent<Health>();
+            if (h != null && h.team == team) continue;
+
+            return true;
+        }
+        return false;
+    }
+
     // ---- Targeting and firing ----------------------------------------------
 
     bool HasTargetInCone()
@@ -175,16 +194,15 @@ public class TurretWeapon : MonoBehaviour
         float half = CurrentConeAngle * 0.5f * spreadAmount;
         Vector3 dir = Quaternion.Euler(0f, Random.Range(-half, half), 0f) * FlatForward();
 
-        // If a wall sits between the turret centre and the muzzle (vehicle pressed against a wall),
-        // start the bullet at the centre so it hits that wall instead of starting inside it.
+        // If a wall or an enemy sits between the turret centre and the muzzle (pressed up against it),
+        // start the bullet at the centre so it hits that thing instead of starting beyond or inside it.
         Vector3 origin = AimOrigin();
         Vector3 spawn = muzzle.position;
         float toMuzzle = Vector3.Distance(origin, new Vector3(spawn.x, origin.y, spawn.z));
-        float check = toMuzzle + 0.2f;
-        if (WallDistance(origin, dir, check) < check) spawn = origin;
+        if (SolidAhead(origin, dir, toMuzzle + 0.2f)) spawn = origin;
 
         Projectile p = Instantiate(projectilePrefab, spawn, Quaternion.LookRotation(dir));
-        p.Launch(dir, projectileSpeed, damage, range, team);
+        p.Launch(dir, projectileSpeed, damage, range, team, body);
     }
 
     // ---- Cone display ------------------------------------------------------
