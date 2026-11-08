@@ -21,6 +21,9 @@ public class EnemySpawner : MonoBehaviour
     void Start()
     {
         timer = firstDelay;
+
+        // Build the pathfinding grid now, while the level loads, instead of when the first enemy appears.
+        _ = NavGrid.Instance;
     }
 
     void Update()
