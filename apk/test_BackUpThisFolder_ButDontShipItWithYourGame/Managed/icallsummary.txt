@@ -395,6 +395,7 @@ UnityEngine.Canvas::get_pixelRect_Injected
 UnityEngine.Canvas::get_renderingDisplaySize_Injected
 UnityEngine.Canvas::set_overrideSorting_Injected
 UnityEngine.Canvas::set_referencePixelsPerUnit_Injected
+UnityEngine.Canvas::set_renderMode_Injected
 UnityEngine.Canvas::set_scaleFactor_Injected
 UnityEngine.Canvas::set_sortingLayerID_Injected
 UnityEngine.Canvas::set_sortingOrder_Injected
@@ -430,6 +431,7 @@ UnityEngine.CanvasRenderer::set_hasPopInstruction_Injected
 UnityEngine.CanvasRenderer::set_materialCount_Injected
 UnityEngine.CanvasRenderer::set_popMaterialCount_Injected
 UnityEngine.Collider::get_enabled_Injected
+UnityEngine.Collider::get_attachedRigidbody_Injected
 UnityEngine.Collider::ClosestPoint_Injected
 UnityEngine.Collider::set_isTrigger_Injected
 UnityEngine.Collider2D::GetShapes_Internal_Injected
@@ -953,6 +955,7 @@ UnityEngine.Mesh::get_vertexBufferTarget_Injected
 UnityEngine.Mesh::get_indexFormat_Injected
 UnityEngine.Mesh::GetVertexAttributeFormat_Injected
 UnityEngine.MeshFilter::get_sharedMesh_Injected
+UnityEngine.MeshFilter::set_sharedMesh_Injected
 UnityEngine.MonoBehaviour::Internal_IsInvokingAll_Injected
 UnityEngine.MonoBehaviour::IsInvoking_Injected
 UnityEngine.MonoBehaviour::IsObjectMonoBehaviour_Injected
@@ -978,6 +981,7 @@ UnityEngine.Object::FindObjectFromInstanceID_Injected
 UnityEngine.Object::ForceLoadFromInstanceID_Injected
 UnityEngine.Object::Internal_CloneSingleWithParent_Injected
 UnityEngine.Object::Internal_CloneSingle_Injected
+UnityEngine.Object::Internal_InstantiateSingle_Injected
 UnityEngine.Object::DestroyImmediate_Injected
 UnityEngine.Object::Destroy_Injected
 UnityEngine.Object::DontDestroyOnLoad_Injected
@@ -1008,6 +1012,7 @@ UnityEngine.Physics2D::get_queriesHitTriggers
 UnityEngine.Physics2D::GetRayIntersectionAll_Internal_Injected
 UnityEngine.PhysicsScene::Internal_RaycastTest_Injected
 UnityEngine.PhysicsScene::Internal_Raycast_Injected
+UnityEngine.PhysicsScene::Query_SphereCast_Injected
 UnityEngine.PhysicsScene::Internal_RaycastNonAlloc_Injected
 UnityEngine.PhysicsScene2D::GetRayIntersectionArray_Internal_Injected
 UnityEngine.PhysicsScene2D::RaycastArray_Internal_Injected
@@ -1096,6 +1101,8 @@ UnityEngine.Renderer::set_allowOcclusionWhenDynamic_Injected
 UnityEngine.Renderer::set_bounds_Injected
 UnityEngine.Renderer::set_enabled_Injected
 UnityEngine.Renderer::set_localBounds_Injected
+UnityEngine.Renderer::set_receiveShadows_Injected
+UnityEngine.Renderer::set_shadowCastingMode_Injected
 UnityEngine.Renderer::set_smallMeshCulling_Injected
 UnityEngine.Renderer::GetSharedMaterialArray_Injected
 UnityEngine.Renderer::Internal_GetSpriteMaskInteraction_Injected
