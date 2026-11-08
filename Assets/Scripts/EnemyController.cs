@@ -35,7 +35,12 @@ public class EnemyController : MonoBehaviour
     public float attackDamage = 10f;
     public float attackInterval = 1f;       // seconds between hits
 
+    [Header("Knockback")]
+    public float pushDeceleration = 30f;    // how fast a shove fades (units/sec²). Higher = shorter shove
+
     Rigidbody rb;
+    Health health;
+    Vector3 pushVelocity;
     float yaw;
     float attackTimer;
 
@@ -59,6 +64,7 @@ public class EnemyController : MonoBehaviour
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        health = GetComponent<Health>();
 
         // Set here so you don't have to configure the Rigidbody by hand.
         rb.useGravity = false;
@@ -75,12 +81,27 @@ public class EnemyController : MonoBehaviour
         lastProgressPos = transform.position;
     }
 
-    void OnEnable() { All.Add(this); }
-    void OnDisable() { All.Remove(this); }
+    void OnEnable()
+    {
+        All.Add(this);
+        if (health != null) health.Pushed += OnPushed;
+    }
+
+    void OnDisable()
+    {
+        All.Remove(this);
+        if (health != null) health.Pushed -= OnPushed;
+    }
+
+    void OnPushed(Vector3 velocity) { pushVelocity = velocity; }
 
     void FixedUpdate()
     {
         float dt = Time.fixedDeltaTime;
+
+        // The current shove (fades out over time). Added on top of normal movement below.
+        Vector3 push = pushVelocity;
+        pushVelocity = Vector3.MoveTowards(pushVelocity, Vector3.zero, pushDeceleration * dt);
 
         Health target = PickTarget();
         if (target == null)
@@ -111,7 +132,7 @@ public class EnemyController : MonoBehaviour
         // In range, and (for the vehicle) no wall between us: stand and fight.
         if (dist <= stopDistance && (!targetIsVehicle || !StaticBlocked(pos, targetPos)))
         {
-            rb.linearVelocity = Vector3.zero;
+            rb.linearVelocity = push;
             Face(to, dt);
 
             attackTimer -= dt;
@@ -152,7 +173,7 @@ public class EnemyController : MonoBehaviour
 
         if (move.sqrMagnitude > 0.0001f) move.Normalize();
 
-        rb.linearVelocity = move * speed;
+        rb.linearVelocity = move * speed + push;
         Face(move, dt);
         CheckStuck(pos, desired, dt);
     }

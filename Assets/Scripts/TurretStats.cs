@@ -15,6 +15,8 @@ public class TurretStats : ScriptableObject
     [Range(1f, 360f)] public float coneAngle = 30f;    // total width while moving, in degrees
     [Range(0f, 1f)] public float armorPenetration = 0f; // not used yet
     [Min(1)] public float turnSpeed = 270f;            // degrees per second
+    [Min(0), Tooltip("Push on hit: starting shove speed in units/sec. 0 = no knockback (minigun, flamethrower)")]
+    public float knockback = 0f;
 
     [Header("Accuracy")]
     [Range(0f, 1f), Tooltip("1 = bullets can go anywhere in the cone, 0 = always straight")]
@@ -52,7 +54,8 @@ public class TurretStats : ScriptableObject
     public struct Resolved
     {
         public float damage, fireRate, projectileSpeed, range, coneAngle, armorPenetration, turnSpeed,
-                     spreadAmount, stationaryConeMultiplier, stationarySpeed, settleTime, loosenTime;
+                     spreadAmount, stationaryConeMultiplier, stationarySpeed, settleTime, loosenTime,
+                     knockback;
     }
 
     public Resolved AtLevel(int level)
@@ -72,7 +75,8 @@ public class TurretStats : ScriptableObject
             stationaryConeMultiplier = stationaryConeMultiplier,
             stationarySpeed = stationarySpeed,
             settleTime = settleTime,
-            loosenTime = loosenTime
+            loosenTime = loosenTime,
+            knockback = knockback
         };
 
         foreach (var m in milestones)

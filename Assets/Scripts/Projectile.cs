@@ -11,12 +11,13 @@ public class Projectile : MonoBehaviour
     Vector3 direction;
     float speed;
     float damage;
+    float knockback;               // shove speed given to whatever it hits (0 = none)
     float remainingDistance;
     Team ownerTeam;
     Rigidbody ignoreBody;          // the shooter's own body, never hit by its own bullets
     bool startChecked;
 
-    public void Launch(Vector3 dir, float speed, float damage, float range, Team ownerTeam, Rigidbody ignoreBody = null)
+    public void Launch(Vector3 dir, float speed, float damage, float range, Team ownerTeam, Rigidbody ignoreBody = null, float knockback = 0f)
     {
         direction = dir.normalized;
         this.speed = speed;
@@ -24,6 +25,7 @@ public class Projectile : MonoBehaviour
         this.remainingDistance = range;
         this.ownerTeam = ownerTeam;
         this.ignoreBody = ignoreBody;
+        this.knockback = knockback;
     }
 
     void Update()
@@ -48,7 +50,7 @@ public class Projectile : MonoBehaviour
                 // Same team: fly through. Anything else (enemy, wall, obstacle) stops the bullet.
                 if (health == null || health.team != ownerTeam)
                 {
-                    if (health != null) health.TakeDamage(damage);
+                    if (health != null) health.TakeDamage(damage, direction, knockback);
                     Destroy(gameObject);
                     return;
                 }
@@ -80,7 +82,7 @@ public class Projectile : MonoBehaviour
             else blocked = true;
         }
 
-        if (target != null) target.TakeDamage(damage);
+        if (target != null) target.TakeDamage(damage, direction, knockback);
         if (target != null || blocked)
         {
             Destroy(gameObject);

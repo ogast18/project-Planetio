@@ -9,7 +9,7 @@ public class TurretController : MonoBehaviour
     public VirtualStick aimStick;      // drag the AimZone object here
 
     [Header("Stats")]
-    public TurretStats stats;          // drag the Cannon asset here
+    public TurretStats stats;          // drag the turret's stats asset here (e.g. Cannon)
     [Range(1, TurretStats.MaxLevel)] public int level = 1;
 
     // Stats for the current level. The firing script reads this too.

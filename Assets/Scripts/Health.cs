@@ -25,12 +25,13 @@ public class Health : MonoBehaviour
     public bool showDamageNumbers = true;
 
     [Header("Feedback")]
-    public bool hitPunch = true;       // small scale pulse when hit (turn off for the vehicle)
+    public bool hitPunch = true;       // small scale pulse when hit (turn off for the vehicle and for enemies hit by fast-firing turrets)
     public bool destroyOnDeath = true;
 
     public float Current { get; private set; }
     public bool IsAlive => Current > 0f;
     public event Action<Health> Died;
+    public event Action<Vector3> Pushed;   // fires with the shove velocity when a hit has knockback
 
     Vector3 baseScale;
     float punch;
@@ -52,7 +53,8 @@ public class Health : MonoBehaviour
         if (showBar) WorldUI.Instance.AddBar(this);
     }
 
-    public void TakeDamage(float amount)
+    // hitDirection and knockback are optional: TakeDamage(10) still works, with no push.
+    public void TakeDamage(float amount, Vector3 hitDirection = default, float knockback = 0f)
     {
         if (!IsAlive) return;
 
@@ -67,6 +69,12 @@ public class Health : MonoBehaviour
             Current = 0f;
             Died?.Invoke(this);
             if (destroyOnDeath) Destroy(gameObject);
+        }
+        else if (knockback > 0f)
+        {
+            hitDirection.y = 0f;
+            if (hitDirection.sqrMagnitude > 0.0001f)
+                Pushed?.Invoke(hitDirection.normalized * knockback);
         }
     }
 
