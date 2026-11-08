@@ -1,7 +1,10 @@
 using UnityEngine;
 
-// The cannon: fires automatically whenever an enemy is inside the firing cone.
-// The cone is a pie slice in front of the turret (width = coneAngle, length = range).
+// The cannon: fires automatically whenever an enemy is inside the firing cone and not hidden behind a wall.
+// The cone is a pie slice in front of the turret (width = cone angle, length = range) that is cut off by walls.
+// Every bullet flies at a random angle inside the cone, and the cone gets narrower
+// (so aim gets better) while the vehicle stands still.
+// Holding the fire button fires even when there is no target (for shooting walls).
 // Put this on the same Turret object as TurretController.
 public class TurretWeapon : MonoBehaviour
 {
@@ -9,6 +12,7 @@ public class TurretWeapon : MonoBehaviour
     public Transform muzzle;               // drag the Muzzle object here
     public Projectile projectilePrefab;    // drag the Projectile prefab here
     public Material coneMaterial;          // transparent material for the cone display (optional)
+    public FireButton fireButton;          // optional: found automatically if left empty
 
     [Header("Cannon (tune these)")]
     public Team team = Team.Player;
@@ -17,39 +21,128 @@ public class TurretWeapon : MonoBehaviour
     public float projectileSpeed = 18f;    // units per second
     public float range = 12f;              // how far it shoots and how long the cone is
     [Range(1f, 360f)]
-    public float coneAngle = 30f;          // total width of the firing cone, in degrees
+    public float coneAngle = 30f;          // total width of the firing cone while moving, in degrees
+
+    [Header("Accuracy")]
+    [Range(0f, 1f)]
+    public float spreadAmount = 1f;        // 1 = bullets can go anywhere inside the cone, 0 = always straight ahead
+
+    [Header("Aim improves when standing still")]
+    [Range(0.1f, 1f)]
+    public float stationaryConeMultiplier = 0.6f; // cone width when fully settled, as a fraction of coneAngle
+    public float stationarySpeed = 0.3f;   // below this speed the vehicle counts as standing still
+    public float settleTime = 0.5f;        // seconds to fully tighten after stopping
+    public float loosenTime = 0.15f;       // seconds to widen again once moving
+
+    [Header("Walls")]
+    public float coneSegmentAngle = 2f;    // degrees per cone slice: smaller = smoother cut at walls, more raycasts
 
     [Header("Cone display")]
     public bool showCone = true;
     public float groundHeight = 0.05f;     // height of the cone above the ground
 
+    // The cone width right now (between the moving and the settled width).
+    public float CurrentConeAngle { get; private set; }
+
     float cooldown;
+    float sharpness;                       // 0 = moving (full cone), 1 = fully settled
+    Rigidbody body;
     GameObject coneObject;
     Mesh coneMesh;
-    float builtAngle = -1f, builtRange = -1f;
+    Vector3[] coneVerts;
+    int[] coneTris;
+    int builtSegments = -1;
+    readonly RaycastHit[] hitBuffer = new RaycastHit[16];
 
     void Start()
     {
+        body = GetComponentInParent<Rigidbody>();   // the vehicle's Rigidbody
+        if (fireButton == null) fireButton = FindFirstObjectByType<FireButton>();
+        CurrentConeAngle = coneAngle;
         RefreshCone();
     }
 
     void Update()
     {
+        UpdateConeAngle();
+
         cooldown = Mathf.Max(0f, cooldown - Time.deltaTime);
 
-        if (cooldown <= 0f && HasTargetInCone())
+        if (cooldown <= 0f)
         {
-            Fire();
-            cooldown = 1f / Mathf.Max(0.01f, fireRate);
+            bool manual = fireButton != null && fireButton.IsHeld;
+            if (manual || HasTargetInCone())
+            {
+                Fire();
+                cooldown = 1f / Mathf.Max(0.01f, fireRate);
+            }
         }
 
         RefreshCone();
     }
 
+    void UpdateConeAngle()
+    {
+        bool still = body != null && body.linearVelocity.magnitude < stationarySpeed;
+
+        float dt = Time.deltaTime;
+        if (still) sharpness = Mathf.MoveTowards(sharpness, 1f, dt / Mathf.Max(0.01f, settleTime));
+        else sharpness = Mathf.MoveTowards(sharpness, 0f, dt / Mathf.Max(0.01f, loosenTime));
+
+        CurrentConeAngle = Mathf.Lerp(coneAngle, coneAngle * stationaryConeMultiplier, sharpness);
+    }
+
+    // ---- Walls -------------------------------------------------------------
+
+    // Bullets fly at the height of the muzzle, so walls are checked at that height.
+    Vector3 AimOrigin()
+    {
+        Vector3 o = transform.position;
+        if (muzzle != null) o.y = muzzle.position.y;
+        return o;
+    }
+
+    Vector3 FlatForward()
+    {
+        Vector3 f = transform.forward;
+        f.y = 0f;
+        return f.normalized;
+    }
+
+    // Distance to the nearest wall along a direction. A wall is anything solid that is not
+    // a Health object (enemies and allies don't cut the cone) and not part of our own vehicle.
+    float WallDistance(Vector3 origin, Vector3 dir, float maxDistance)
+    {
+        int n = Physics.RaycastNonAlloc(origin, dir, hitBuffer, maxDistance, ~0, QueryTriggerInteraction.Ignore);
+        float best = maxDistance;
+
+        for (int i = 0; i < n; i++)
+        {
+            if (hitBuffer[i].distance >= best) continue;
+
+            Collider c = hitBuffer[i].collider;
+            if (body != null && c.attachedRigidbody == body) continue;
+            if (c.GetComponentInParent<Health>() != null) continue;
+
+            best = hitBuffer[i].distance;
+        }
+        return best;
+    }
+
+    // How far the cone reaches in the direction yawOffset degrees away from straight ahead.
+    float ClipDistance(Vector3 origin, Vector3 flatForward, float yawOffset)
+    {
+        Vector3 dir = Quaternion.Euler(0f, yawOffset, 0f) * flatForward;
+        return WallDistance(origin, dir, range);
+    }
+
+    // ---- Targeting and firing ----------------------------------------------
+
     bool HasTargetInCone()
     {
-        Vector3 forward = transform.forward;
-        forward.y = 0f;
+        Vector3 origin = AimOrigin();
+        Vector3 forward = FlatForward();
+        float half = CurrentConeAngle * 0.5f;
 
         foreach (Health h in Health.All)
         {
@@ -61,9 +154,15 @@ public class TurretWeapon : MonoBehaviour
             if (dist - h.radius > range) continue;
 
             // Counts as inside if any part of the target (its radius) touches the cone.
-            float angle = Vector3.Angle(forward, to);
+            float signed = Vector3.SignedAngle(forward, to, Vector3.up);
             float margin = dist > 0.01f ? Mathf.Asin(Mathf.Clamp01(h.radius / dist)) * Mathf.Rad2Deg : 180f;
-            if (angle - margin <= coneAngle * 0.5f) return true;
+            if (Mathf.Abs(signed) - margin > half) continue;
+
+            // A wall in the way means the shot could never hit, so don't fire.
+            float offset = Mathf.Clamp(signed, -half, half);
+            if (ClipDistance(origin, forward, offset) < dist - h.radius) continue;
+
+            return true;
         }
         return false;
     }
@@ -72,14 +171,23 @@ public class TurretWeapon : MonoBehaviour
     {
         if (projectilePrefab == null || muzzle == null) return;
 
-        Vector3 dir = muzzle.forward;
-        dir.y = 0f;
+        // Random direction inside the cone.
+        float half = CurrentConeAngle * 0.5f * spreadAmount;
+        Vector3 dir = Quaternion.Euler(0f, Random.Range(-half, half), 0f) * FlatForward();
 
-        Projectile p = Instantiate(projectilePrefab, muzzle.position, Quaternion.LookRotation(dir));
+        // If a wall sits between the turret centre and the muzzle (vehicle pressed against a wall),
+        // start the bullet at the centre so it hits that wall instead of starting inside it.
+        Vector3 origin = AimOrigin();
+        Vector3 spawn = muzzle.position;
+        float toMuzzle = Vector3.Distance(origin, new Vector3(spawn.x, origin.y, spawn.z));
+        float check = toMuzzle + 0.2f;
+        if (WallDistance(origin, dir, check) < check) spawn = origin;
+
+        Projectile p = Instantiate(projectilePrefab, spawn, Quaternion.LookRotation(dir));
         p.Launch(dir, projectileSpeed, damage, range, team);
     }
 
-    // ---- Cone display ----------------------------------------------------
+    // ---- Cone display ------------------------------------------------------
 
     void RefreshCone()
     {
@@ -102,36 +210,42 @@ public class TurretWeapon : MonoBehaviour
         }
 
         coneObject.SetActive(showCone);
+        if (!showCone) return;
 
-        // Rebuild only when the numbers changed (for example while tuning in Play mode).
-        if (Mathf.Approximately(builtAngle, coneAngle) && Mathf.Approximately(builtRange, range)) return;
-        builtAngle = coneAngle;
-        builtRange = range;
+        float half = CurrentConeAngle * 0.5f;
+        int segments = Mathf.Clamp(Mathf.CeilToInt(CurrentConeAngle / Mathf.Max(0.5f, coneSegmentAngle)), 2, 180);
 
-        int segments = Mathf.Max(2, Mathf.CeilToInt(coneAngle / 5f));
-        float half = coneAngle * 0.5f;
+        // Only rebuild the triangle list when the number of slices changes.
+        if (segments != builtSegments)
+        {
+            builtSegments = segments;
+            coneVerts = new Vector3[segments + 2];
+            coneTris = new int[segments * 3];
+            for (int i = 0; i < segments; i++)
+            {
+                coneTris[i * 3] = 0;
+                coneTris[i * 3 + 1] = i + 1;
+                coneTris[i * 3 + 2] = i + 2;
+            }
+            coneMesh.Clear();
+            coneMesh.vertices = coneVerts;
+            coneMesh.triangles = coneTris;
+        }
 
-        var verts = new Vector3[segments + 2];
-        var tris = new int[segments * 3];
-        verts[0] = Vector3.zero;
+        // The outline is re-measured every frame, so it follows walls as you drive and aim.
+        Vector3 origin = AimOrigin();
+        Vector3 forward = FlatForward();
 
+        coneVerts[0] = Vector3.zero;
         for (int i = 0; i <= segments; i++)
         {
-            float a = Mathf.Lerp(-half, half, i / (float)segments) * Mathf.Deg2Rad;
-            verts[i + 1] = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * range;
+            float offset = Mathf.Lerp(-half, half, i / (float)segments);
+            float d = ClipDistance(origin, forward, offset);
+            float a = offset * Mathf.Deg2Rad;
+            coneVerts[i + 1] = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * d;
         }
 
-        for (int i = 0; i < segments; i++)
-        {
-            tris[i * 3] = 0;
-            tris[i * 3 + 1] = i + 1;
-            tris[i * 3 + 2] = i + 2;
-        }
-
-        coneMesh.Clear();
-        coneMesh.vertices = verts;
-        coneMesh.triangles = tris;
-        coneMesh.RecalculateNormals();
+        coneMesh.vertices = coneVerts;
         coneMesh.RecalculateBounds();
     }
 }
