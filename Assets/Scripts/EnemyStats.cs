@@ -26,6 +26,9 @@ public class EnemyStats : ScriptableObject
     public float speed = 2.5f;              // units per second
     public float turnSpeed = 360f;          // degrees per second (only affects how fast it faces where it walks)
 
+    [Range(0f, 3f), Tooltip("How strongly it avoids spots where enemies died for nothing and prefers spots where they dealt damage. 0 = ignores what was learned (detonators), 1 = normal, higher = very cautious")]
+    public float riskAversion = 1f;
+
     [Header("Choosing a target")]
     public float chaseRange = 8f;           // the vehicle this close makes it go after the vehicle
     public float loseRange = 12f;           // ...and it gives up beyond this distance
@@ -51,7 +54,7 @@ public class EnemyStats : ScriptableObject
     public struct Resolved
     {
         public AttackType attackType;
-        public float maxHealth, armorPercent, knockbackResistance, speed, turnSpeed, chaseRange, loseRange,
+        public float maxHealth, armorPercent, knockbackResistance, speed, turnSpeed, riskAversion, chaseRange, loseRange,
                      damage, attackInterval, attackRange, projectileSpeed, projectileSpread, explosionRadius;
     }
 
@@ -67,6 +70,7 @@ public class EnemyStats : ScriptableObject
             knockbackResistance = knockbackResistance,
             speed = speed,
             turnSpeed = turnSpeed,
+            riskAversion = riskAversion,
             chaseRange = chaseRange,
             loseRange = loseRange,
             damage = damage * damageMultiplier,

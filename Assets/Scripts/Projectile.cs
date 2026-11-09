@@ -12,13 +12,18 @@ public class Projectile : MonoBehaviour
     float speed;
     float damage;
     float knockback;               // shove speed given to whatever it hits (0 = none)
+    System.Action<float, Vector3> onDamageDealt;   // told (damage, where it was fired from) when it hurts something
+    Vector3 launchPosition;
     float remainingDistance;
     Team ownerTeam;
     Rigidbody ignoreBody;          // the shooter's own body, never hit by its own bullets
     bool startChecked;
 
-    public void Launch(Vector3 dir, float speed, float damage, float range, Team ownerTeam, Rigidbody ignoreBody = null, float knockback = 0f)
+    public void Launch(Vector3 dir, float speed, float damage, float range, Team ownerTeam, Rigidbody ignoreBody = null, float knockback = 0f,
+                       System.Action<float, Vector3> onDamageDealt = null)
     {
+        this.onDamageDealt = onDamageDealt;
+        launchPosition = transform.position;
         direction = dir.normalized;
         this.speed = speed;
         this.damage = damage;
@@ -50,7 +55,11 @@ public class Projectile : MonoBehaviour
                 // Same team: fly through. Anything else (enemy, wall, obstacle) stops the bullet.
                 if (health == null || health.team != ownerTeam)
                 {
-                    if (health != null) health.TakeDamage(damage, direction, knockback);
+                    if (health != null)
+                    {
+                        health.TakeDamage(damage, direction, knockback);
+                        onDamageDealt?.Invoke(damage, launchPosition);
+                    }
                     Destroy(gameObject);
                     return;
                 }
@@ -82,7 +91,11 @@ public class Projectile : MonoBehaviour
             else blocked = true;
         }
 
-        if (target != null) target.TakeDamage(damage, direction, knockback);
+        if (target != null)
+        {
+            target.TakeDamage(damage, direction, knockback);
+            onDamageDealt?.Invoke(damage, launchPosition);
+        }
         if (target != null || blocked)
         {
             Destroy(gameObject);

@@ -20,7 +20,7 @@ MonoBehaviour:
   armorPenetration: 0.4
   turnSpeed: 150
   knockback: 8
-  spreadAmount: 1
+  spreadAmount: 0.5
   stationaryConeMultiplier: 0.3
   stationarySpeed: 0.3
   settleTime: 1

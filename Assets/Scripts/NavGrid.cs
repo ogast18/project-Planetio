@@ -6,6 +6,11 @@ using UnityEngine;
 // around them with A*. It creates itself the first time an enemy asks for a route, so there is
 // nothing to add to the scene. Select the "NavGrid" object during Play mode to see blocked cells.
 // Assumes walls and obstacles don't move (they are measured once, when the grid is built).
+//
+// It also LEARNS: enemies report where they died for nothing, where they stood around unable to attack,
+// and where they dealt damage. That becomes a "risk" number per cell. Routes through risky cells cost
+// more, so enemies that care (Risk Aversion in their EnemyStats) take a longer way round. The risk fades
+// over time. Select the NavGrid in Play mode: orange = learned danger, green = damage was dealt from here.
 public class NavGrid : MonoBehaviour
 {
     static NavGrid instance;
@@ -32,10 +37,17 @@ public class NavGrid : MonoBehaviour
     public float checkBottom = 0.3f;     // height band above the ground that counts as "in the way"
     public float checkTop = 1.0f;
     public bool drawGizmos = true;
+    public bool drawLearning = true;     // show what the enemies have learned (needs the NavGrid selected)
 
     int width, height;
     Vector3 origin;                      // world position of the grid's minimum corner
     bool[] blocked;
+
+    // What the enemies have learned (see PathLearningSettings for the numbers).
+    float[] risk;                        // extra cost of walking here (0 = safe)
+    float[] value;                       // how much damage was dealt from here (only used for the debug view)
+    PathLearningSettings settings;
+    float decayTimer;
 
     // A* working memory, reused for every search so it creates no garbage.
     float[] gCost;
@@ -50,6 +62,11 @@ public class NavGrid : MonoBehaviour
 
     static readonly int[] stepX = { 1, -1, 0, 0, 1, 1, -1, -1 };
     static readonly int[] stepZ = { 0, 0, 1, -1, 1, -1, 1, -1 };
+
+    bool LearningOn => blocked != null && settings != null && settings.learningEnabled;
+
+    // How long an enemy may stand still unable to attack before it counts as a bad spot.
+    public float IdleSeconds => settings != null ? settings.idleSeconds : 4f;
 
     // ---- Building the grid -------------------------------------------------
 
@@ -74,6 +91,9 @@ public class NavGrid : MonoBehaviour
         parent = new int[count];
         seenStamp = new int[count];
         closedStamp = new int[count];
+        risk = new float[count];
+        value = new float[count];
+        settings = PathLearningSettings.Load();
 
         Physics.SyncTransforms();   // make sure freshly created walls are known to the physics system
 
@@ -101,6 +121,78 @@ public class NavGrid : MonoBehaviour
         for (int i = 0; i < n; i++)
             if (overlapBuffer[i].attachedRigidbody == null) return true;
         return false;
+    }
+
+    // ---- Learning ------------------------------------------------------------
+
+    // Everything learned slowly fades, so old lessons don't last forever (the vehicle moves around).
+    void Update()
+    {
+        if (!LearningOn) return;
+
+        decayTimer += Time.deltaTime;
+        if (decayTimer < 0.25f) return;
+
+        float factor = Mathf.Pow(0.5f, decayTimer / Mathf.Max(0.5f, settings.halfLifeSeconds));
+        decayTimer = 0f;
+
+        for (int i = 0; i < risk.Length; i++)
+        {
+            risk[i] *= factor;
+            value[i] *= factor;
+        }
+    }
+
+    // An enemy died at 'pos'. The less damage it dealt first (compared to what it should manage), the riskier the spot.
+    public void RecordDeath(Vector3 pos, float damageDealt, float attackDamage)
+    {
+        if (!LearningOn) return;
+
+        float needed = Mathf.Max(0.01f, attackDamage * settings.attacksToExcuse);
+        float wasted = 1f - Mathf.Clamp01(damageDealt / needed);
+        Splat(pos, settings.deathRisk * wasted, 0f);
+    }
+
+    // An enemy stood still at 'pos' for a while without being able to attack (stuck behind a wall, for example).
+    public void RecordFruitless(Vector3 pos)
+    {
+        if (!LearningOn) return;
+        Splat(pos, settings.idleRisk, 0f);
+    }
+
+    // An enemy dealt damage while standing at 'pos': that spot pays off, so it becomes less risky.
+    public void RecordDamage(Vector3 pos, float damage)
+    {
+        if (!LearningOn || damage <= 0f) return;
+        Splat(pos, -damage * settings.reliefPerDamage, damage);
+    }
+
+    // Adds a lesson around a world position: strongest in the middle, fading to nothing at the radius.
+    void Splat(Vector3 pos, float riskDelta, float valueDelta)
+    {
+        float radius = settings.riskRadius;
+        int cx = Mathf.FloorToInt((pos.x - origin.x) / cellSize);
+        int cz = Mathf.FloorToInt((pos.z - origin.z) / cellSize);
+        int reach = Mathf.CeilToInt(radius / cellSize);
+
+        for (int dz = -reach; dz <= reach; dz++)
+        {
+            for (int dx = -reach; dx <= reach; dx++)
+            {
+                int x = cx + dx, z = cz + dz;
+                if (x < 0 || z < 0 || x >= width || z >= height) continue;
+
+                int idx = z * width + x;
+                if (blocked[idx]) continue;
+
+                float d = Dist(CellCenter(x, z), pos);
+                if (d >= radius) continue;
+
+                float w = 1f - d / radius;
+                risk[idx] = Mathf.Clamp(risk[idx] + riskDelta * w, 0f, settings.maxRisk);
+                value[idx] = Mathf.Max(0f, value[idx] + valueDelta * w);
+            }
+        }
     }
 
     // ---- Helpers -------------------------------------------------------------
@@ -149,7 +241,9 @@ public class NavGrid : MonoBehaviour
 
     // True if a straight line from a to b only crosses free cells. Cells within endIgnore of b are not
     // checked, because the target itself may be standing in a blocked cell.
-    bool LineClear(Vector3 a, Vector3 b, float endIgnore = 0f)
+    // maxCellRisk: when given, cells riskier than this also count as "not clear" (used so route smoothing
+    // doesn't cut straight back through a danger zone that the route was avoiding).
+    bool LineClear(Vector3 a, Vector3 b, float endIgnore = 0f, float maxCellRisk = float.MaxValue)
     {
         float fx = b.x - a.x, fz = b.z - a.z;
         float len = Mathf.Sqrt(fx * fx + fz * fz);
@@ -164,7 +258,10 @@ public class NavGrid : MonoBehaviour
             if (endIgnore > 0f && len * (1f - t) < endIgnore) break;
 
             int node = NodeAt(new Vector3(a.x + fx * t, 0f, a.z + fz * t));
-            if (node != startNode && blocked[node]) return false;
+            if (node == startNode) continue;
+
+            if (blocked[node]) return false;
+            if (maxCellRisk < float.MaxValue && risk[node] > maxCellRisk) return false;
         }
         return true;
     }
@@ -172,15 +269,21 @@ public class NavGrid : MonoBehaviour
     // ---- Finding a route -----------------------------------------------------
 
     // Fills 'result' with waypoints leading from 'from' to within arriveRadius of 'to'.
-    // needLineOfSight: also require a clear view of the target at the end (used for chasing the tank).
+    // needLineOfSight: also require a clear view of the target at the end (used for chasing the tank,
+    //   and by shooters, which need a clear shot). lineEndIgnore: how much of the line next to the target
+    //   is not checked (the target's own size, since it may stand in a blocked cell).
+    // riskAversion: how much this enemy avoids learned danger (0 = ignores it).
     // Returns false if there is no grid (the caller should then just walk straight).
-    public bool FindPath(Vector3 from, Vector3 to, float arriveRadius, bool needLineOfSight, List<Vector3> result)
+    public bool FindPath(Vector3 from, Vector3 to, float arriveRadius, bool needLineOfSight, List<Vector3> result,
+                         float lineEndIgnore = 1.2f, float riskAversion = 0f)
     {
         result.Clear();
         if (blocked == null) return false;
 
         int start = NearestFree(NodeAt(from), from);
         if (start < 0) return false;
+
+        bool useRisk = riskAversion > 0f && LearningOn;
 
         stamp++;
         heapCount = 0;
@@ -205,7 +308,7 @@ public class NavGrid : MonoBehaviour
             // Remember the closest we ever got, in case the target can't be reached.
             if (h < bestH) { bestH = h; best = cur; }
 
-            if (h <= arriveRadius && (!needLineOfSight || LineClear(cc, to, 1.2f)))
+            if (h <= arriveRadius && (!needLineOfSight || LineClear(cc, to, lineEndIgnore)))
             {
                 best = cur;
                 break;
@@ -223,7 +326,12 @@ public class NavGrid : MonoBehaviour
                 bool diagonal = d >= 4;
                 if (diagonal && (blocked[cz * width + nx] || blocked[nz * width + cx])) continue;
 
-                float ng = gCost[cur] + (diagonal ? 1.4142f : 1f) * cellSize;
+                // Distance cost, made higher by learned risk. The multiplier is never below 1,
+                // so the straight-line distance used to steer the search stays a safe estimate.
+                float step = (diagonal ? 1.4142f : 1f) * cellSize;
+                if (useRisk) step *= 1f + risk[nb] * riskAversion;
+
+                float ng = gCost[cur] + step;
                 if (seenStamp[nb] != stamp || ng < gCost[nb])
                 {
                     seenStamp[nb] = stamp;
@@ -240,12 +348,12 @@ public class NavGrid : MonoBehaviour
         result.Reverse();
 
         if (result.Count > 1) result.RemoveAt(0);   // we are already standing in the first cell
-        Smooth(from, result);
+        Smooth(from, result, useRisk ? 0.25f / riskAversion : float.MaxValue);
         return true;
     }
 
     // Removes unnecessary waypoints so enemies cut straight across open ground instead of following the grid.
-    void Smooth(Vector3 from, List<Vector3> path)
+    void Smooth(Vector3 from, List<Vector3> path, float maxCellRisk)
     {
         if (path.Count < 2) return;
 
@@ -256,7 +364,7 @@ public class NavGrid : MonoBehaviour
         while (i < path.Count)
         {
             int j = path.Count - 1;
-            while (j > i && !LineClear(anchor, path[j])) j--;
+            while (j > i && !LineClear(anchor, path[j], 0f, maxCellRisk)) j--;
 
             smoothTemp.Add(path[j]);
             anchor = path[j];
@@ -322,14 +430,43 @@ public class NavGrid : MonoBehaviour
 
     void OnDrawGizmosSelected()
     {
-        if (!drawGizmos || blocked == null) return;
+        if (blocked == null) return;
 
-        Gizmos.color = new Color(1f, 0.2f, 0.2f, 0.35f);
         Vector3 size = new Vector3(cellSize * 0.9f, 0.1f, cellSize * 0.9f);
 
-        for (int z = 0; z < height; z++)
-            for (int x = 0; x < width; x++)
-                if (blocked[z * width + x])
-                    Gizmos.DrawCube(CellCenter(x, z) + Vector3.up * 0.05f, size);
+        if (drawGizmos)
+        {
+            Gizmos.color = new Color(1f, 0.2f, 0.2f, 0.35f);
+            for (int z = 0; z < height; z++)
+                for (int x = 0; x < width; x++)
+                    if (blocked[z * width + x])
+                        Gizmos.DrawCube(CellCenter(x, z) + Vector3.up * 0.05f, size);
+        }
+
+        if (drawLearning && risk != null && settings != null)
+        {
+            float maxRisk = Mathf.Max(0.01f, settings.maxRisk);
+            for (int z = 0; z < height; z++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int i = z * width + x;
+
+                    float r = risk[i] / maxRisk;
+                    if (r > 0.03f)
+                    {
+                        Gizmos.color = new Color(1f, 0.5f, 0f, 0.15f + 0.6f * Mathf.Clamp01(r));
+                        Gizmos.DrawCube(CellCenter(x, z) + Vector3.up * 0.12f, size);
+                    }
+
+                    float v = Mathf.Clamp01(value[i] / 60f);
+                    if (v > 0.03f)
+                    {
+                        Gizmos.color = new Color(0.2f, 1f, 0.3f, 0.15f + 0.5f * v);
+                        Gizmos.DrawCube(CellCenter(x, z) + Vector3.up * 0.2f, size * 0.6f);
+                    }
+                }
+            }
+        }
     }
 }

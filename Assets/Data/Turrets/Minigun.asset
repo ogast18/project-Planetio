@@ -16,11 +16,11 @@ MonoBehaviour:
   fireRate: 12
   projectileSpeed: 35
   range: 12
-  coneAngle: 15
+  coneAngle: 30
   armorPenetration: 0
   turnSpeed: 230
   knockback: 0
-  spreadAmount: 1
+  spreadAmount: 0.5
   stationaryConeMultiplier: 0.5
   stationarySpeed: 0.3
   settleTime: 0.5

@@ -6,6 +6,8 @@ using UnityEngine;
 // If the vehicle comes close it drops everything and goes after the vehicle instead,
 // then returns to the base when the vehicle gets far away again.
 // How it fights depends on its EnemyStats asset: Melee hits, Ranged shoots, Kamikaze explodes.
+// It also learns: it tells the NavGrid where it dealt damage, where it died for nothing and where it got
+// stuck, and plans its routes around that (how much it cares is Risk Aversion in its EnemyStats).
 // Put this on the Enemy object (together with a Health component).
 [RequireComponent(typeof(Rigidbody))]
 public class EnemyController : MonoBehaviour
@@ -44,6 +46,13 @@ public class EnemyController : MonoBehaviour
     float yaw;
     float attackTimer;
     bool exploded;
+    bool wasBlocked;                        // was a wall blocking the shot last step?
+
+    // Learning
+    float damageDealt;                      // total damage this enemy has dealt in its life
+    float idleTimer;                        // seconds standing still without being able to attack
+    Vector3 prevPos;
+    System.Action<float, Vector3> reportHit;   // handed to our bullets so they can tell us when they hurt something
 
     VehicleController vehicle;
     Health vehicleHealth;
@@ -68,6 +77,7 @@ public class EnemyController : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         health = GetComponent<Health>();
+        reportHit = CreditDamage;
 
         // Set here so you don't have to configure the Rigidbody by hand.
         rb.useGravity = false;
@@ -86,21 +96,44 @@ public class EnemyController : MonoBehaviour
         attackTimer = stats != null ? s.attackInterval : 1f;
         repathTimer = Random.value * baseRepathInterval;   // so enemies don't all plan on the same frame
         lastProgressPos = transform.position;
+        prevPos = transform.position;
     }
 
     void OnEnable()
     {
         All.Add(this);
-        if (health != null) health.Pushed += OnPushed;
+        if (health != null)
+        {
+            health.Pushed += OnPushed;
+            health.Died += OnDied;
+        }
     }
 
     void OnDisable()
     {
         All.Remove(this);
-        if (health != null) health.Pushed -= OnPushed;
+        if (health != null)
+        {
+            health.Pushed -= OnPushed;
+            health.Died -= OnDied;
+        }
     }
 
     void OnPushed(Vector3 velocity) { pushVelocity = velocity * (1f - s.knockbackResistance); }
+
+    // Died without dealing damage = a bad place to go. The NavGrid works out how bad.
+    void OnDied(Health h)
+    {
+        if (stats == null) return;
+        NavGrid.Instance.RecordDeath(transform.position, damageDealt, s.damage);
+    }
+
+    // Called whenever this enemy (or one of its bullets) deals damage.
+    void CreditDamage(float amount, Vector3 from)
+    {
+        damageDealt += amount;
+        NavGrid.Instance.RecordDamage(from, amount);
+    }
 
     // For the spawner: make this enemy stronger (e.g. later waves, boosted planets).
     public void SetScaling(float health, float damage)
@@ -155,14 +188,26 @@ public class EnemyController : MonoBehaviour
         float dist = to.magnitude;
         float stopDistance = target.radius + s.attackRange;
 
+        // How fast it actually moved since the last step (used to notice it is stuck).
+        float speedNow = (pos - prevPos).magnitude / dt;
+        prevPos = pos;
+
         // Shooters need a clear line even to the base; everyone needs one to reach the vehicle.
         bool needsLineOfSight = targetIsVehicle || s.attackType == EnemyStats.AttackType.Ranged;
 
+        // In range but a wall is in the way: it cannot attack from here, it has to move to find a clear line.
+        bool inRange = dist <= stopDistance;
+        bool blocked = inRange && needsLineOfSight && StaticBlocked(pos, targetPos, target);
+
+        if (blocked && !wasBlocked) repathTimer = 0f;   // plan a new route right away
+        wasBlocked = blocked;
+
         // In range, and (when needed) no wall between us: attack.
-        if (dist <= stopDistance && (!needsLineOfSight || !StaticBlocked(pos, targetPos, target)))
+        if (inRange && !blocked)
         {
             rb.linearVelocity = push;
             Face(to, dt);
+            idleTimer = 0f;
 
             if (s.attackType == EnemyStats.AttackType.Kamikaze)
             {
@@ -174,8 +219,15 @@ public class EnemyController : MonoBehaviour
             if (attackTimer <= 0f)
             {
                 attackTimer = s.attackInterval;
-                if (s.attackType == EnemyStats.AttackType.Ranged) Shoot(to, dist);
-                else target.TakeDamage(s.damage);
+                if (s.attackType == EnemyStats.AttackType.Ranged)
+                {
+                    Shoot(to, dist);
+                }
+                else
+                {
+                    target.TakeDamage(s.damage);
+                    CreditDamage(s.damage, pos);
+                }
             }
 
             progressTimer = 0f;
@@ -183,12 +235,33 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
+        // Standing around unable to attack (stuck behind a wall, for example) is a bad place to be.
+        if (speedNow < s.speed * 0.2f)
+        {
+            idleTimer += dt;
+            if (idleTimer >= NavGrid.Instance.IdleSeconds)
+            {
+                idleTimer = 0f;
+                NavGrid.Instance.RecordFruitless(pos);
+            }
+        }
+        else
+        {
+            idleTimer = 0f;
+        }
+
         // Plan a route now and then.
         repathTimer -= dt;
         if (repathTimer <= 0f)
         {
             repathTimer = targetIsVehicle ? chaseRepathInterval : baseRepathInterval;
-            if (!NavGrid.Instance.FindPath(pos, targetPos, stopDistance * 0.85f, targetIsVehicle, path))
+
+            // The route ends where the enemy is in range AND (for shooters and when chasing) has a clear line.
+            // lineEndIgnore: the target's own size, so a big target like the base doesn't block its own view.
+            float lineEndIgnore = Mathf.Max(1.2f, target.radius + 0.6f);
+
+            if (!NavGrid.Instance.FindPath(pos, targetPos, stopDistance * 0.85f, needsLineOfSight, path,
+                                           lineEndIgnore, s.riskAversion))
                 path.Clear();
             pathIndex = 0;
         }
@@ -235,7 +308,7 @@ public class EnemyController : MonoBehaviour
         Vector3 spawn = center + dir * (bodyRadius + 0.2f);
 
         Projectile p = Instantiate(stats.projectilePrefab, spawn, Quaternion.LookRotation(dir));
-        p.Launch(dir, s.projectileSpeed, s.damage, distance + 4f, MyTeam, rb);
+        p.Launch(dir, s.projectileSpeed, s.damage, distance + 4f, MyTeam, rb, 0f, reportHit);
     }
 
     // Kamikaze: damages everything of the other team inside the blast, then dies.
@@ -245,6 +318,7 @@ public class EnemyController : MonoBehaviour
         exploded = true;
 
         Vector3 center = transform.position;
+        float dealt = 0f;
 
         for (int i = Health.All.Count - 1; i >= 0; i--)
         {
@@ -254,8 +328,14 @@ public class EnemyController : MonoBehaviour
             Vector3 d = h.transform.position - center;
             d.y = 0f;
             if (d.magnitude - h.radius <= s.explosionRadius)
+            {
                 h.TakeDamage(s.damage);
+                dealt += s.damage;
+            }
         }
+
+        // Counted before dying, so a detonator that blew up on its target is not treated as wasted.
+        if (dealt > 0f) CreditDamage(dealt, center);
 
         if (explosionEffect != null)
         {

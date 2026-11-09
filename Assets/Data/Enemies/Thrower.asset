@@ -18,6 +18,7 @@ MonoBehaviour:
   knockbackResistance: 0
   speed: 2.5
   turnSpeed: 360
+  riskAversion: 1.7
   chaseRange: 12
   loseRange: 18
   damage: 12
