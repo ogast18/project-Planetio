@@ -3,6 +3,7 @@ using UnityEngine;
 
 // Spawns enemies over time. Spawns a fixed number in total (then the level can be won),
 // or keeps going forever if Total Enemies is 0.
+// Each spawn picks one of the Enemy Types at random; a higher weight means it is picked more often.
 // Put this on an empty object on the far side of the map from the base.
 public class EnemySpawner : MonoBehaviour
 {
@@ -11,8 +12,16 @@ public class EnemySpawner : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics() { All.Clear(); }
 
+    [System.Serializable]
+    public class EnemyType
+    {
+        public GameObject prefab;           // e.g. the Warrior, Thrower or Detonator prefab
+        [Min(0)] public float weight = 1f;  // 0 = never picked; 2 = twice as likely as 1
+    }
+
     [Header("References")]
-    public GameObject enemyPrefab;          // drag the Enemy prefab here
+    public EnemyType[] enemyTypes;          // the mix of enemies this spawner can create
+    public GameObject enemyPrefab;          // old single slot: only used if Enemy Types is empty
     public Transform[] spawnPoints;         // optional: if empty, it spawns around this object
 
     [Header("Spawning (tune these)")]
@@ -77,9 +86,38 @@ public class EnemySpawner : MonoBehaviour
             if (spawned[i] == null) spawned.RemoveAt(i);
     }
 
+    // Picks one prefab from Enemy Types by weight (falls back to the old single Enemy Prefab slot).
+    GameObject PickPrefab()
+    {
+        float total = 0f;
+        GameObject last = null;
+
+        if (enemyTypes != null)
+        {
+            foreach (EnemyType t in enemyTypes)
+            {
+                if (t == null || t.prefab == null || t.weight <= 0f) continue;
+                total += t.weight;
+                last = t.prefab;
+            }
+        }
+
+        if (total <= 0f) return enemyPrefab;
+
+        float roll = Random.value * total;
+        foreach (EnemyType t in enemyTypes)
+        {
+            if (t == null || t.prefab == null || t.weight <= 0f) continue;
+            roll -= t.weight;
+            if (roll <= 0f) return t.prefab;
+        }
+        return last;   // only reached by rounding at the very end
+    }
+
     void Spawn()
     {
-        if (enemyPrefab == null) return;
+        GameObject prefab = PickPrefab();
+        if (prefab == null) return;
 
         Transform p = (spawnPoints != null && spawnPoints.Length > 0)
             ? spawnPoints[Random.Range(0, spawnPoints.Length)]
@@ -87,10 +125,10 @@ public class EnemySpawner : MonoBehaviour
 
         Vector2 offset = Random.insideUnitCircle * spawnRadius;
         Vector3 pos = new Vector3(p.position.x + offset.x,
-                                  enemyPrefab.transform.position.y,   // keep the height saved in the prefab
+                                  prefab.transform.position.y,   // keep the height saved in the prefab
                                   p.position.z + offset.y);
 
-        spawned.Add(Instantiate(enemyPrefab, pos, Quaternion.identity));
+        spawned.Add(Instantiate(prefab, pos, Quaternion.identity));
         spawnedTotal++;
     }
 }

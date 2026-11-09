@@ -12,13 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8900ef13784424243b8a7fa1125315f8, type: 3}
   m_Name: Minigun
   m_EditorClassIdentifier: Assembly-CSharp::TurretStats
-  baseDamage: 25
+  baseDamage: 3
   fireRate: 12
   projectileSpeed: 35
   range: 12
   coneAngle: 15
   armorPenetration: 0
   turnSpeed: 230
+  knockback: 0
   spreadAmount: 1
   stationaryConeMultiplier: 0.5
   stationarySpeed: 0.3

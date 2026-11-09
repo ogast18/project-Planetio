@@ -19,6 +19,7 @@ MonoBehaviour:
   coneAngle: 30
   armorPenetration: 0
   turnSpeed: 270
+  knockback: 3
   spreadAmount: 1
   stationaryConeMultiplier: 0.5
   stationarySpeed: 0.3

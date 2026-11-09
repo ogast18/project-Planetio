@@ -78,9 +78,7 @@ public class Health : MonoBehaviour
 
         if (Current <= 0f)
         {
-            Current = 0f;
-            Died?.Invoke(this);
-            if (destroyOnDeath) Destroy(gameObject);
+            Die();
         }
         else if (knockback > 0f)
         {
@@ -88,6 +86,20 @@ public class Health : MonoBehaviour
             if (hitDirection.sqrMagnitude > 0.0001f)
                 Pushed?.Invoke(hitDirection.normalized * knockback);
         }
+    }
+
+    // Instant death with no armor and no damage number (e.g. a kamikaze enemy that explodes).
+    public void Kill()
+    {
+        if (!IsAlive) return;
+        Die();
+    }
+
+    void Die()
+    {
+        Current = 0f;
+        Died?.Invoke(this);
+        if (destroyOnDeath) Destroy(gameObject);
     }
 
     void Update()

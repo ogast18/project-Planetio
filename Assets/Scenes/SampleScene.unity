@@ -1388,7 +1388,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: daa2d176ebdfd50498de1a9396029593, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemySpawner
-  enemyPrefab: {fileID: 6848960436077837666, guid: 87e3ba04c69de7b48a2eca1856f8e6a7, type: 3}
+  enemyTypes:
+  - prefab: {fileID: 6848960436077837666, guid: 87e3ba04c69de7b48a2eca1856f8e6a7, type: 3}
+    weight: 0
+  - prefab: {fileID: 2340276476886438891, guid: 6a54808ec5d681c439d989647cfd3300, type: 3}
+    weight: 1
+  - prefab: {fileID: 3588966683746945387, guid: a15a98ec8f374484686ad015aa17db8f, type: 3}
+    weight: 0
+  enemyPrefab: {fileID: 0}
   spawnPoints: []
   totalEnemies: 15
   firstDelay: 2
@@ -3601,15 +3608,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 12943b2d35c65084abbd9142cfbd5ce4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VehicleController
-  maxSpeed: 6
-  maxReverseSpeed: 3.5
-  acceleration: 14
-  turnSpeed: 220
-  sideGrip: 8
-  fullTurnSpeed: 2
-  minDrive: 0.35
-  reverseConeAngle: 90
-  reverseSwitchMargin: 12
+  stats: {fileID: 11400000, guid: 917c1c1797793864a93d0351f0564b00, type: 2}
+  level: 1
   moveStick: {fileID: 1871496788}
 --- !u!65 &2031885912
 BoxCollider:
@@ -3748,7 +3748,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TurretController
   aimStick: {fileID: 2023063012}
-  stats: {fileID: 11400000, guid: 042d9f9c690f89a4a916681d7d9252e4, type: 2}
+  stats: {fileID: 11400000, guid: e310bbeced8aef14581e5b50530cfb8f, type: 2}
   level: 1
 --- !u!114 &2034326826
 MonoBehaviour:

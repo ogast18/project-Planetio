@@ -12,18 +12,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8900ef13784424243b8a7fa1125315f8, type: 3}
   m_Name: Heavy Cannon
   m_EditorClassIdentifier: Assembly-CSharp::TurretStats
-  baseDamage: 25
-  fireRate: 1.5
-  projectileSpeed: 18
-  range: 12
-  coneAngle: 30
-  armorPenetration: 0
-  turnSpeed: 270
-  knockback: 0
+  baseDamage: 75
+  fireRate: 0.5
+  projectileSpeed: 30
+  range: 14
+  coneAngle: 35
+  armorPenetration: 0.4
+  turnSpeed: 150
+  knockback: 8
   spreadAmount: 1
-  stationaryConeMultiplier: 0.6
+  stationaryConeMultiplier: 0.3
   stationarySpeed: 0.3
-  settleTime: 0.5
+  settleTime: 1
   loosenTime: 0.15
   damageMultiplier:
     serializedVersion: 2

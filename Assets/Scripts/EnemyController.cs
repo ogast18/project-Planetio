@@ -5,6 +5,7 @@ using UnityEngine;
 // keeps away from other enemies, and sidesteps and re-plans if it stops making progress.
 // If the vehicle comes close it drops everything and goes after the vehicle instead,
 // then returns to the base when the vehicle gets far away again.
+// How it fights depends on its EnemyStats asset: Melee hits, Ranged shoots, Kamikaze explodes.
 // Put this on the Enemy object (together with a Health component).
 [RequireComponent(typeof(Rigidbody))]
 public class EnemyController : MonoBehaviour
@@ -14,35 +15,35 @@ public class EnemyController : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics() { All.Clear(); }
 
-    [Header("Movement (tune these)")]
-    public float speed = 2.5f;              // units per second
-    public float turnSpeed = 360f;          // degrees per second (only affects how fast it faces where it walks)
-    public float waypointReach = 0.5f;      // how close counts as "arrived" at a waypoint
+    [Header("Stats")]
+    public EnemyStats stats;                // drag the enemy's stats asset here (e.g. Warrior)
+    [Tooltip("Wave / planet scaling. 1 = the asset's numbers")]
+    public float healthMultiplier = 1f;
+    public float damageMultiplier = 1f;
 
-    [Header("Avoiding walls and each other")]
+    [Header("Navigation (tune these)")]
+    public float waypointReach = 0.5f;      // how close counts as "arrived" at a waypoint
     public float separationRadius = 1.2f;   // enemies closer than this push each other apart
     public float separationStrength = 0.8f;
     public float stuckTime = 0.8f;          // seconds without progress before it tries another way out
     public float baseRepathInterval = 1.5f; // how often it re-plans the route to the base
     public float chaseRepathInterval = 0.4f;// how often it re-plans while chasing the vehicle
 
-    [Header("Choosing a target")]
-    public float chaseRange = 8f;           // the vehicle this close makes it go after the vehicle
-    public float loseRange = 12f;           // ...and it gives up beyond this distance
-
-    [Header("Attack (tune these)")]
-    public float attackRange = 1.2f;        // how close to the target's edge it gets before attacking
-    public float attackDamage = 10f;
-    public float attackInterval = 1f;       // seconds between hits
-
     [Header("Knockback")]
     public float pushDeceleration = 30f;    // how fast a shove fades (units/sec²). Higher = shorter shove
 
+    [Header("Effects and setup")]
+    public float projectileHeight = 0.6f;   // height bullets fly at (Ranged enemies)
+    public GameObject explosionEffect;      // optional, e.g. a sphere prefab (Kamikaze enemies)
+    public bool scaleEffectToRadius = true; // scale the effect to the explosion size (right for a unit sphere)
+
     Rigidbody rb;
     Health health;
+    EnemyStats.Resolved s;                  // this step's stats (multipliers applied)
     Vector3 pushVelocity;
     float yaw;
     float attackTimer;
+    bool exploded;
 
     VehicleController vehicle;
     Health vehicleHealth;
@@ -61,6 +62,8 @@ public class EnemyController : MonoBehaviour
 
     readonly RaycastHit[] hitBuffer = new RaycastHit[16];
 
+    Team MyTeam => health != null ? health.team : Team.Enemy;
+
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
@@ -75,8 +78,12 @@ public class EnemyController : MonoBehaviour
         rb.linearDamping = 0f;
         rb.angularDamping = 0f;
 
+        if (stats == null)
+            Debug.LogError("EnemyController has no EnemyStats assigned, so this enemy will not act.", this);
+        RefreshStats();
+
         yaw = transform.eulerAngles.y;
-        attackTimer = attackInterval;
+        attackTimer = stats != null ? s.attackInterval : 1f;
         repathTimer = Random.value * baseRepathInterval;   // so enemies don't all plan on the same frame
         lastProgressPos = transform.position;
     }
@@ -93,10 +100,29 @@ public class EnemyController : MonoBehaviour
         if (health != null) health.Pushed -= OnPushed;
     }
 
-    void OnPushed(Vector3 velocity) { pushVelocity = velocity; }
+    void OnPushed(Vector3 velocity) { pushVelocity = velocity * (1f - s.knockbackResistance); }
+
+    // For the spawner: make this enemy stronger (e.g. later waves, boosted planets).
+    public void SetScaling(float health, float damage)
+    {
+        healthMultiplier = health;
+        damageMultiplier = damage;
+        RefreshStats();
+    }
+
+    // Reads the asset (so Play Mode tuning is live) and gives Health its max health and armor.
+    void RefreshStats()
+    {
+        if (stats == null) return;
+        s = stats.Get(healthMultiplier, damageMultiplier);
+        if (health != null) health.Configure(s.maxHealth, s.armorPercent);
+    }
 
     void FixedUpdate()
     {
+        if (stats == null) return;
+        RefreshStats();
+
         float dt = Time.fixedDeltaTime;
 
         // The current shove (fades out over time). Added on top of normal movement below.
@@ -127,19 +153,29 @@ public class EnemyController : MonoBehaviour
         Vector3 to = targetPos - pos;
         to.y = 0f;
         float dist = to.magnitude;
-        float stopDistance = target.radius + attackRange;
+        float stopDistance = target.radius + s.attackRange;
 
-        // In range, and (for the vehicle) no wall between us: stand and fight.
-        if (dist <= stopDistance && (!targetIsVehicle || !StaticBlocked(pos, targetPos)))
+        // Shooters need a clear line even to the base; everyone needs one to reach the vehicle.
+        bool needsLineOfSight = targetIsVehicle || s.attackType == EnemyStats.AttackType.Ranged;
+
+        // In range, and (when needed) no wall between us: attack.
+        if (dist <= stopDistance && (!needsLineOfSight || !StaticBlocked(pos, targetPos, target)))
         {
             rb.linearVelocity = push;
             Face(to, dt);
 
+            if (s.attackType == EnemyStats.AttackType.Kamikaze)
+            {
+                Explode();
+                return;
+            }
+
             attackTimer -= dt;
             if (attackTimer <= 0f)
             {
-                attackTimer = attackInterval;
-                target.TakeDamage(attackDamage);
+                attackTimer = s.attackInterval;
+                if (s.attackType == EnemyStats.AttackType.Ranged) Shoot(to, dist);
+                else target.TakeDamage(s.damage);
             }
 
             progressTimer = 0f;
@@ -173,9 +209,63 @@ public class EnemyController : MonoBehaviour
 
         if (move.sqrMagnitude > 0.0001f) move.Normalize();
 
-        rb.linearVelocity = move * speed + push;
+        rb.linearVelocity = move * s.speed + push;
         Face(move, dt);
         CheckStuck(pos, desired, dt);
+    }
+
+    // ---- Attacks ------------------------------------------------------------------
+
+    // Ranged: fires one projectile toward the target, with a random spread.
+    void Shoot(Vector3 toTarget, float distance)
+    {
+        if (stats.projectilePrefab == null)
+        {
+            Debug.LogWarning("Ranged enemy has no Projectile Prefab in its EnemyStats.", this);
+            return;
+        }
+        if (toTarget.sqrMagnitude < 0.0001f) return;
+
+        float half = s.projectileSpread * 0.5f;
+        Vector3 dir = Quaternion.Euler(0f, Random.Range(-half, half), 0f) * toTarget.normalized;
+
+        float bodyRadius = health != null ? health.radius : 0.5f;
+        Vector3 center = transform.position;
+        center.y = projectileHeight;
+        Vector3 spawn = center + dir * (bodyRadius + 0.2f);
+
+        Projectile p = Instantiate(stats.projectilePrefab, spawn, Quaternion.LookRotation(dir));
+        p.Launch(dir, s.projectileSpeed, s.damage, distance + 4f, MyTeam, rb);
+    }
+
+    // Kamikaze: damages everything of the other team inside the blast, then dies.
+    void Explode()
+    {
+        if (exploded) return;
+        exploded = true;
+
+        Vector3 center = transform.position;
+
+        for (int i = Health.All.Count - 1; i >= 0; i--)
+        {
+            Health h = Health.All[i];
+            if (h == health || h.team == MyTeam || !h.IsAlive) continue;
+
+            Vector3 d = h.transform.position - center;
+            d.y = 0f;
+            if (d.magnitude - h.radius <= s.explosionRadius)
+                h.TakeDamage(s.damage);
+        }
+
+        if (explosionEffect != null)
+        {
+            GameObject fx = Instantiate(explosionEffect, center, Quaternion.identity);
+            if (scaleEffectToRadius) fx.transform.localScale = Vector3.one * s.explosionRadius * 2f;
+            Destroy(fx, 0.5f);
+        }
+
+        if (health != null) health.Kill();
+        else Destroy(gameObject);
     }
 
     // ---- Choosing who to go after ------------------------------------------------
@@ -200,8 +290,8 @@ public class EnemyController : MonoBehaviour
             float dist = d.magnitude;
 
             // Two distances (start / give up) so it doesn't flicker between targets at the edge.
-            if (!chasing && dist <= chaseRange) chasing = true;
-            else if (chasing && dist > loseRange) chasing = false;
+            if (!chasing && dist <= s.chaseRange) chasing = true;
+            else if (chasing && dist > s.loseRange) chasing = false;
         }
         else
         {
@@ -255,7 +345,7 @@ public class EnemyController : MonoBehaviour
         progressTimer = 0f;
         lastProgressPos = pos;
 
-        if (moved < speed * stuckTime * 0.25f)
+        if (moved < s.speed * stuckTime * 0.25f)
         {
             Vector3 side = new Vector3(desired.z, 0f, -desired.x) * (Random.value < 0.5f ? 1f : -1f);
             escapeDir = (side - desired * 0.3f).normalized;
@@ -269,14 +359,15 @@ public class EnemyController : MonoBehaviour
         if (dir.sqrMagnitude > 0.0001f)
         {
             float targetYaw = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
-            yaw = Mathf.MoveTowardsAngle(yaw, targetYaw, turnSpeed * dt);
+            yaw = Mathf.MoveTowardsAngle(yaw, targetYaw, s.turnSpeed * dt);
         }
         rb.MoveRotation(Quaternion.Euler(0f, yaw, 0f));
         rb.angularVelocity = Vector3.zero;
     }
 
     // True if a fixed wall or obstacle is between two points (moving things don't count).
-    bool StaticBlocked(Vector3 a, Vector3 b)
+    // The target itself never counts as a wall (the base has no Rigidbody, so it would otherwise block its own attackers).
+    bool StaticBlocked(Vector3 a, Vector3 b, Health ignore)
     {
         a.y = 0.6f;
         b.y = 0.6f;
@@ -286,7 +377,12 @@ public class EnemyController : MonoBehaviour
 
         int n = Physics.RaycastNonAlloc(a, d / len, hitBuffer, len, ~0, QueryTriggerInteraction.Ignore);
         for (int i = 0; i < n; i++)
-            if (hitBuffer[i].collider.attachedRigidbody == null) return true;
+        {
+            Collider c = hitBuffer[i].collider;
+            if (c.attachedRigidbody != null) continue;
+            if (ignore != null && c.GetComponentInParent<Health>() == ignore) continue;
+            return true;
+        }
         return false;
     }
 }

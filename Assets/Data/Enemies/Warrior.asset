@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa44ca0b57367fa40b5482d81b2c3d39, type: 3}
+  m_Name: Warrior
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyStats
+  attackType: 0
+  baseHealth: 100
+  armorPercent: 30
+  knockbackResistance: 0.3
+  speed: 2
+  turnSpeed: 200
+  chaseRange: 8
+  loseRange: 12
+  damage: 15
+  attackInterval: 1
+  attackRange: 1.2
+  projectilePrefab: {fileID: 0}
+  projectileSpeed: 8
+  projectileSpread: 5
+  explosionRadius: 2.5

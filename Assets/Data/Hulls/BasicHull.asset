@@ -49,7 +49,7 @@ MonoBehaviour:
     m_RotationOrder: 4
   milestones:
   - level: 10
-    armorBonus: 0
+    armorBonus: 5
     speedMultiplier: 1.1
     accelerationMultiplier: 1
     turnSpeedMultiplier: 1
@@ -59,7 +59,7 @@ MonoBehaviour:
     accelerationMultiplier: 1
     turnSpeedMultiplier: 1
   - level: 30
-    armorBonus: 0
+    armorBonus: 5
     speedMultiplier: 1.1
     accelerationMultiplier: 1
     turnSpeedMultiplier: 1.1
