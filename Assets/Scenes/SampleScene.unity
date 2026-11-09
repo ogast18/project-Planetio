@@ -1390,11 +1390,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EnemySpawner
   enemyTypes:
   - prefab: {fileID: 6848960436077837666, guid: 87e3ba04c69de7b48a2eca1856f8e6a7, type: 3}
-    weight: 0
+    weight: 3
   - prefab: {fileID: 2340276476886438891, guid: 6a54808ec5d681c439d989647cfd3300, type: 3}
     weight: 1
   - prefab: {fileID: 3588966683746945387, guid: a15a98ec8f374484686ad015aa17db8f, type: 3}
-    weight: 0
+    weight: 2
   enemyPrefab: {fileID: 0}
   spawnPoints: []
   totalEnemies: 15
