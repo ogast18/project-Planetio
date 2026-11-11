@@ -307,7 +307,7 @@ public class EnemyController : MonoBehaviour
         center.y = projectileHeight;
         Vector3 spawn = center + dir * (bodyRadius + 0.2f);
 
-        Projectile p = Instantiate(stats.projectilePrefab, spawn, Quaternion.LookRotation(dir));
+        Projectile p = ProjectilePool.Get(stats.projectilePrefab, spawn, Quaternion.LookRotation(dir));
         p.Launch(dir, s.projectileSpeed, s.damage, distance + 4f, MyTeam, rb, 0f, reportHit);
     }
 

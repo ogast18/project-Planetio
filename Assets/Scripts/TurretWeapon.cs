@@ -17,6 +17,8 @@ public class TurretWeapon : MonoBehaviour
 
     [Header("Setup")]
     public Team team = Team.Player;
+    [Min(0), Tooltip("Bullets prepared in advance so the first shots don't have to create any. A fast turret needs more")]
+    public int prewarm = 20;
 
     [Header("Walls")]
     public float coneSegmentAngle = 3f;    // degrees per cone slice: smaller = smoother cut at walls, more raycasts
@@ -55,6 +57,7 @@ public class TurretWeapon : MonoBehaviour
 
         s = controller.Current;
         CurrentConeAngle = s.coneAngle;
+        ProjectilePool.Prewarm(projectilePrefab, prewarm);
         RefreshCone();
     }
 
@@ -187,6 +190,13 @@ public class TurretWeapon : MonoBehaviour
     {
         if (projectilePrefab == null || muzzle == null) return;
 
+        // One bullet for most turrets, several pellets for a shotgun. Each flies at its own random angle.
+        int pellets = Mathf.Max(1, s.pelletsPerShot);
+        for (int i = 0; i < pellets; i++) FireOne();
+    }
+
+    void FireOne()
+    {
         // Random direction inside the cone.
         float half = CurrentConeAngle * 0.5f * s.spreadAmount;
         Vector3 dir = Quaternion.Euler(0f, Random.Range(-half, half), 0f) * FlatForward();
@@ -198,8 +208,8 @@ public class TurretWeapon : MonoBehaviour
         float toMuzzle = Vector3.Distance(origin, new Vector3(spawn.x, origin.y, spawn.z));
         if (SolidAhead(origin, dir, toMuzzle + 0.2f)) spawn = origin;
 
-        Projectile p = Instantiate(projectilePrefab, spawn, Quaternion.LookRotation(dir));
-        p.Launch(dir, s.projectileSpeed, s.damage, s.range, team, body, s.knockback, null, s.armorPenetration);
+        Projectile p = ProjectilePool.Get(projectilePrefab, spawn, Quaternion.LookRotation(dir));
+        p.Launch(dir, s.projectileSpeed, s.damage, s.range, team, body, s.knockback, null, s.armorPenetration, s.damageFalloff);
     }
 
     // ---- Cone display ------------------------------------------------------
