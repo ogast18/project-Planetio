@@ -88,6 +88,13 @@ public class Health : MonoBehaviour
         }
     }
 
+    // Restores health up to the maximum (used by the base's repairs between waves). Does nothing once dead.
+    public void Heal(float amount)
+    {
+        if (!IsAlive || amount <= 0f) return;
+        Current = Mathf.Min(maxHealth, Current + amount);
+    }
+
     // Instant death with no armor and no damage number (e.g. a kamikaze enemy that explodes).
     public void Kill()
     {

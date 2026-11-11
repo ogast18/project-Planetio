@@ -4,6 +4,8 @@ using UnityEngine;
 // Spawns enemies over time. Spawns a fixed number in total (then the level can be won),
 // or keeps going forever if Total Enemies is 0.
 // Each spawn picks one of the Enemy Types at random; a higher weight means it is picked more often.
+// If a WaveManager is in the scene, it takes over: it starts each wave on every spawner
+// (with that wave's count, speed, enemy mix and strength) and the spawner waits in between.
 // Put this on an empty object on the far side of the map from the base.
 public class EnemySpawner : MonoBehaviour
 {
@@ -31,9 +33,20 @@ public class EnemySpawner : MonoBehaviour
     public int maxAlive = 5;                // it waits when this many of its enemies are alive
     public float spawnRadius = 4f;          // random spread around the spawn point
 
+    [Header("Waves (set by the WaveManager, no need to touch)")]
+    public bool waveControlled;             // true = waits for the WaveManager to start each wave
+
     readonly List<GameObject> spawned = new List<GameObject>();
     float timer;
     int spawnedTotal;
+
+    // Wave state
+    bool waveRunning;
+    float waveHealth = 1f, waveDamage = 1f;
+    EnemyType[] waveTypes;                  // this wave's own mix (null = use Enemy Types)
+
+    // While true the spawner never reports "finished" (so the level isn't won between waves).
+    public bool KeepOpen { get; set; }
 
     // Enemies of this spawner that are alive right now.
     public int Alive
@@ -50,7 +63,13 @@ public class EnemySpawner : MonoBehaviour
     // Everything has been spawned and defeated.
     public bool IsFinished
     {
-        get { return totalEnemies > 0 && spawnedTotal >= totalEnemies && Alive == 0; }
+        get { return !KeepOpen && totalEnemies > 0 && spawnedTotal >= totalEnemies && Alive == 0; }
+    }
+
+    // The current wave has been spawned and defeated.
+    public bool WaveDone
+    {
+        get { return waveRunning && spawnedTotal >= totalEnemies && Alive == 0; }
     }
 
     void OnEnable() { All.Add(this); }
@@ -64,8 +83,28 @@ public class EnemySpawner : MonoBehaviour
         _ = NavGrid.Instance;
     }
 
+    // Called by the WaveManager at the start of every wave.
+    public void BeginWave(int count, float newInterval, int newMaxAlive,
+                          float healthMultiplier, float damageMultiplier, EnemyType[] typesOverride)
+    {
+        waveControlled = true;
+        waveRunning = true;
+
+        totalEnemies = Mathf.Max(1, count);   // 0 would mean "endless"
+        spawnedTotal = 0;
+        interval = newInterval;
+        maxAlive = newMaxAlive;
+
+        waveHealth = healthMultiplier;
+        waveDamage = damageMultiplier;
+        waveTypes = typesOverride;
+
+        timer = 0.5f;
+    }
+
     void Update()
     {
+        if (waveControlled && !waveRunning) return;                     // waiting for the next wave
         if (totalEnemies > 0 && spawnedTotal >= totalEnemies) return;   // all spawned
 
         timer -= Time.deltaTime;
@@ -86,15 +125,17 @@ public class EnemySpawner : MonoBehaviour
             if (spawned[i] == null) spawned.RemoveAt(i);
     }
 
-    // Picks one prefab from Enemy Types by weight (falls back to the old single Enemy Prefab slot).
+    // Picks one prefab from the enemy mix by weight (falls back to the old single Enemy Prefab slot).
     GameObject PickPrefab()
     {
+        EnemyType[] types = (waveTypes != null && waveTypes.Length > 0) ? waveTypes : enemyTypes;
+
         float total = 0f;
         GameObject last = null;
 
-        if (enemyTypes != null)
+        if (types != null)
         {
-            foreach (EnemyType t in enemyTypes)
+            foreach (EnemyType t in types)
             {
                 if (t == null || t.prefab == null || t.weight <= 0f) continue;
                 total += t.weight;
@@ -105,7 +146,7 @@ public class EnemySpawner : MonoBehaviour
         if (total <= 0f) return enemyPrefab;
 
         float roll = Random.value * total;
-        foreach (EnemyType t in enemyTypes)
+        foreach (EnemyType t in types)
         {
             if (t == null || t.prefab == null || t.weight <= 0f) continue;
             roll -= t.weight;
@@ -128,7 +169,16 @@ public class EnemySpawner : MonoBehaviour
                                   prefab.transform.position.y,   // keep the height saved in the prefab
                                   p.position.z + offset.y);
 
-        spawned.Add(Instantiate(prefab, pos, Quaternion.identity));
+        GameObject enemy = Instantiate(prefab, pos, Quaternion.identity);
+
+        // Later waves are stronger.
+        if (waveControlled)
+        {
+            EnemyController ec = enemy.GetComponent<EnemyController>();
+            if (ec != null) ec.SetScaling(waveHealth, waveDamage);
+        }
+
+        spawned.Add(enemy);
         spawnedTotal++;
     }
 }

@@ -1066,6 +1066,7 @@ MonoBehaviour:
   interval: 4
   maxAlive: 7
   spawnRadius: 2
+  waveControlled: 0
 --- !u!4 &1087188933
 Transform:
   m_ObjectHideFlags: 0
@@ -1171,6 +1172,92 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1103758465}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1265690995
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1265690997}
+  - component: {fileID: 1265690996}
+  m_Layer: 0
+  m_Name: WaveManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1265690996
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1265690995}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eea9a571541a29441b21625900ff7fec, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WaveManager
+  firstWaveDelay: 3
+  waves:
+  - enemiesPerSpawner: 8
+    interval: 3
+    maxAlive: 5
+    healthMultiplier: 1
+    damageMultiplier: 1
+    enemyTypes:
+    - prefab: {fileID: 6848960436077837666, guid: 87e3ba04c69de7b48a2eca1856f8e6a7, type: 3}
+      weight: 3
+    - prefab: {fileID: 3588966683746945387, guid: a15a98ec8f374484686ad015aa17db8f, type: 3}
+      weight: 2
+    - prefab: {fileID: 2340276476886438891, guid: 6a54808ec5d681c439d989647cfd3300, type: 3}
+      weight: 1
+    breakSeconds: 10
+  - enemiesPerSpawner: 12
+    interval: 3
+    maxAlive: 7
+    healthMultiplier: 1.3
+    damageMultiplier: 1.2
+    enemyTypes:
+    - prefab: {fileID: 6848960436077837666, guid: 87e3ba04c69de7b48a2eca1856f8e6a7, type: 3}
+      weight: 3
+    - prefab: {fileID: 2340276476886438891, guid: 6a54808ec5d681c439d989647cfd3300, type: 3}
+      weight: 2
+    - prefab: {fileID: 3588966683746945387, guid: a15a98ec8f374484686ad015aa17db8f, type: 3}
+      weight: 2
+    breakSeconds: 10
+  - enemiesPerSpawner: 16
+    interval: 2
+    maxAlive: 8
+    healthMultiplier: 1.6
+    damageMultiplier: 1.4
+    enemyTypes:
+    - prefab: {fileID: 6848960436077837666, guid: 87e3ba04c69de7b48a2eca1856f8e6a7, type: 3}
+      weight: 1
+    - prefab: {fileID: 2340276476886438891, guid: 6a54808ec5d681c439d989647cfd3300, type: 3}
+      weight: 1
+    - prefab: {fileID: 3588966683746945387, guid: a15a98ec8f374484686ad015aa17db8f, type: 3}
+      weight: 2
+    breakSeconds: 10
+  showHud: 1
+--- !u!4 &1265690997
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1265690995}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 5.39372, y: 0, z: 11.52584}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1323107527
 GameObject:
   m_ObjectHideFlags: 0
@@ -1291,6 +1378,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f9162dafe5dff6f4e8dde5705ef1b076, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerBase
+  stats: {fileID: 11400000, guid: 01fc2667c3101d44cb6be99777c04f63, type: 2}
+  tier: 1
+  attributes: []
+  visualAnchor: {fileID: 0}
 --- !u!114 &1512758265
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2555,3 +2646,4 @@ SceneRoots:
   - {fileID: 1512758266}
   - {fileID: 1087188933}
   - {fileID: 117528730}
+  - {fileID: 1265690997}
