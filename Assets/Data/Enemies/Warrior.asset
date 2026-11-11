@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EnemyStats
   attackType: 0
   baseHealth: 100
-  armorPercent: 30
+  armorPercent: 40
   knockbackResistance: 0.3
   speed: 2
   turnSpeed: 200

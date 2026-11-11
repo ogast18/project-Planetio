@@ -12,6 +12,7 @@ public class Projectile : MonoBehaviour
     float speed;
     float damage;
     float knockback;               // shove speed given to whatever it hits (0 = none)
+    float armorPenetration;        // fraction of the target's armor this bullet ignores (0 to 1)
     System.Action<float, Vector3> onDamageDealt;   // told (damage, where it was fired from) when it hurts something
     Vector3 launchPosition;
     float remainingDistance;
@@ -20,9 +21,10 @@ public class Projectile : MonoBehaviour
     bool startChecked;
 
     public void Launch(Vector3 dir, float speed, float damage, float range, Team ownerTeam, Rigidbody ignoreBody = null, float knockback = 0f,
-                       System.Action<float, Vector3> onDamageDealt = null)
+                       System.Action<float, Vector3> onDamageDealt = null, float armorPenetration = 0f)
     {
         this.onDamageDealt = onDamageDealt;
+        this.armorPenetration = armorPenetration;
         launchPosition = transform.position;
         direction = dir.normalized;
         this.speed = speed;
@@ -57,7 +59,7 @@ public class Projectile : MonoBehaviour
                 {
                     if (health != null)
                     {
-                        health.TakeDamage(damage, direction, knockback);
+                        health.TakeDamage(damage, direction, knockback, armorPenetration);
                         onDamageDealt?.Invoke(damage, launchPosition);
                     }
                     Destroy(gameObject);
@@ -93,7 +95,7 @@ public class Projectile : MonoBehaviour
 
         if (target != null)
         {
-            target.TakeDamage(damage, direction, knockback);
+            target.TakeDamage(damage, direction, knockback, armorPenetration);
             onDamageDealt?.Invoke(damage, launchPosition);
         }
         if (target != null || blocked)

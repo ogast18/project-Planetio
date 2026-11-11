@@ -65,12 +65,13 @@ public class Health : MonoBehaviour
         Current = Mathf.Min(maxHealth, ratio * maxHealth);
     }
 
-    // hitDirection and knockback are optional: TakeDamage(10) still works, with no push.
-    public void TakeDamage(float amount, Vector3 hitDirection = default, float knockback = 0f)
+    // hitDirection, knockback and armorPenetration are optional: TakeDamage(10) still works,
+    // with no push and no penetration. armorPenetration is the fraction of this target's armor the hit ignores.
+    public void TakeDamage(float amount, Vector3 hitDirection = default, float knockback = 0f, float armorPenetration = 0f)
     {
         if (!IsAlive) return;
 
-        float applied = amount * (1f - armorPercent / 100f);
+        float applied = DamageCalc.Apply(amount, armorPercent, armorPenetration);
         Current -= applied;
         punch = 1f;
 

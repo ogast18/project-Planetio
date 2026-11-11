@@ -199,7 +199,7 @@ public class TurretWeapon : MonoBehaviour
         if (SolidAhead(origin, dir, toMuzzle + 0.2f)) spawn = origin;
 
         Projectile p = Instantiate(projectilePrefab, spawn, Quaternion.LookRotation(dir));
-        p.Launch(dir, s.projectileSpeed, s.damage, s.range, team, body, s.knockback);
+        p.Launch(dir, s.projectileSpeed, s.damage, s.range, team, body, s.knockback, null, s.armorPenetration);
     }
 
     // ---- Cone display ------------------------------------------------------

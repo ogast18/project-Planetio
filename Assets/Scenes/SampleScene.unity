@@ -1212,9 +1212,9 @@ MonoBehaviour:
     - prefab: {fileID: 6848960436077837666, guid: 87e3ba04c69de7b48a2eca1856f8e6a7, type: 3}
       weight: 3
     - prefab: {fileID: 3588966683746945387, guid: a15a98ec8f374484686ad015aa17db8f, type: 3}
-      weight: 2
+      weight: 0
     - prefab: {fileID: 2340276476886438891, guid: 6a54808ec5d681c439d989647cfd3300, type: 3}
-      weight: 1
+      weight: 0
     breakSeconds: 10
   - enemiesPerSpawner: 12
     interval: 3
@@ -1243,6 +1243,7 @@ MonoBehaviour:
       weight: 2
     breakSeconds: 10
   showHud: 1
+  hudTopOffset: 70
 --- !u!4 &1265690997
 Transform:
   m_ObjectHideFlags: 0
@@ -2607,7 +2608,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TurretController
   aimStick: {fileID: 2023063012}
-  stats: {fileID: 11400000, guid: 1b8996eb7a9f9604590226fab0dd0e28, type: 2}
+  stats: {fileID: 11400000, guid: 042d9f9c690f89a4a916681d7d9252e4, type: 2}
   level: 1
 --- !u!114 &2034326826
 MonoBehaviour:

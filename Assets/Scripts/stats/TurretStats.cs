@@ -13,7 +13,8 @@ public class TurretStats : ScriptableObject
     [FormerlySerializedAs("bulletSpeed"), Min(1)] public float projectileSpeed = 18f;  // units per second
     [Min(1)] public float range = 12f;
     [Range(1f, 360f)] public float coneAngle = 30f;    // total width while moving, in degrees
-    [Range(0f, 1f)] public float armorPenetration = 0f; // not used yet
+    [Range(0f, 1f), Tooltip("Fraction of the target's armor that is ignored. 0 = none, 0.5 = half the armor, 1 = ignores armor completely")]
+    public float armorPenetration = 0f;
     [Min(1)] public float turnSpeed = 270f;            // degrees per second
     [Min(0), Tooltip("Push on hit: starting shove speed in units/sec. 0 = no knockback (minigun, flamethrower)")]
     public float knockback = 0f;
@@ -48,6 +49,8 @@ public class TurretStats : ScriptableObject
         public float rangeBonus = 0f;
         [Min(0.1f)] public float coneAngleMultiplier = 1f;
         [Min(0.1f)] public float fireRateMultiplier = 1f;
+        [Tooltip("Added to armor penetration (0.1 = ignores another 10% of the target's armor)")]
+        public float armorPenetrationBonus = 0f;
     }
 
     // What the turret actually uses at a given level
@@ -85,7 +88,10 @@ public class TurretStats : ScriptableObject
             r.range += m.rangeBonus;
             r.coneAngle *= m.coneAngleMultiplier;
             r.fireRate *= m.fireRateMultiplier;
+            r.armorPenetration += m.armorPenetrationBonus;
         }
+
+        r.armorPenetration = Mathf.Clamp01(r.armorPenetration);
         return r;
     }
 }
