@@ -44,6 +44,7 @@ public class WaveManager : MonoBehaviour
 
     [Header("Temporary on-screen text and skip button")]
     public bool showHud = true;             // turn off once you have a real wave display
+    public float hudTopOffset = 70f;        // how far down the text starts (bigger = lower, clear of the enemies-left message)
 
     public enum State { Waiting, Fighting, Break, Done }
     public State CurrentState { get; private set; } = State.Waiting;
@@ -185,9 +186,9 @@ public class WaveManager : MonoBehaviour
         else if (CurrentState == State.Fighting) text = "Wave " + WaveNumber + " / " + WaveCount;
         else text = "Wave " + WaveNumber + " cleared. Next wave in " + Mathf.CeilToInt(BreakTimeLeft) + " s";
 
-        GUI.Label(new Rect(0f, 8f, width, 30f), text, labelStyle);
+        GUI.Label(new Rect(0f, hudTopOffset, width, 30f), text, labelStyle);
 
-        if (IsBreak && GUI.Button(new Rect(width * 0.5f - 70f, 40f, 140f, 36f), "Skip break"))
+        if (IsBreak && GUI.Button(new Rect(width * 0.5f - 70f, hudTopOffset + 32f, 140f, 36f), "Skip break"))
             SkipBreak();
     }
 }
