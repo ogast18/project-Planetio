@@ -54,11 +54,14 @@ MonoBehaviour:
     rangeBonus: 1.5
     coneAngleMultiplier: 0.9
     fireRateMultiplier: 1.1
+    armorPenetrationBonus: 0.2
   - level: 20
     rangeBonus: 2
     coneAngleMultiplier: 0.9
     fireRateMultiplier: 1.1
+    armorPenetrationBonus: 0
   - level: 30
     rangeBonus: 1.5
     coneAngleMultiplier: 0.8
     fireRateMultiplier: 1.2
+    armorPenetrationBonus: 0

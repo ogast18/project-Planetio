@@ -1381,7 +1381,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerBase
   stats: {fileID: 11400000, guid: 01fc2667c3101d44cb6be99777c04f63, type: 2}
   tier: 1
-  attributes: []
+  attributes:
+  - {fileID: 11400000, guid: b001f4a36298cf442928402d6c924e10, type: 2}
   visualAnchor: {fileID: 0}
 --- !u!114 &1512758265
 MonoBehaviour:
