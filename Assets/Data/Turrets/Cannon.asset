@@ -18,6 +18,31 @@ MonoBehaviour:
   range: 12
   coneAngle: 30
   armorPenetration: 0
+  pelletsPerShot: 1
+  damageFalloff:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   turnSpeed: 270
   knockback: 3
   spreadAmount: 0.5
@@ -51,17 +76,20 @@ MonoBehaviour:
     m_RotationOrder: 4
   milestones:
   - level: 10
-    rangeBonus: 1.5
+    rangeBonus: 1
     coneAngleMultiplier: 0.9
     fireRateMultiplier: 1.1
     armorPenetrationBonus: 0.2
+    pelletBonus: 0
   - level: 20
-    rangeBonus: 2
-    coneAngleMultiplier: 0.9
+    rangeBonus: 1
+    coneAngleMultiplier: 1
     fireRateMultiplier: 1.1
     armorPenetrationBonus: 0
+    pelletBonus: 0
   - level: 30
     rangeBonus: 1.5
     coneAngleMultiplier: 0.8
     fireRateMultiplier: 1.2
     armorPenetrationBonus: 0
+    pelletBonus: 0

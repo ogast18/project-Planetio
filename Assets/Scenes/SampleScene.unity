@@ -2609,7 +2609,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TurretController
   aimStick: {fileID: 2023063012}
-  stats: {fileID: 11400000, guid: 042d9f9c690f89a4a916681d7d9252e4, type: 2}
+  stats: {fileID: 11400000, guid: e310bbeced8aef14581e5b50530cfb8f, type: 2}
   level: 1
 --- !u!114 &2034326826
 MonoBehaviour:
@@ -2628,6 +2628,7 @@ MonoBehaviour:
   coneMaterial: {fileID: 2100000, guid: 3c4912dd666ed384d8088f482f932a6b, type: 2}
   fireButton: {fileID: 2028912235}
   team: 0
+  prewarm: 20
   coneSegmentAngle: 2
   showCone: 1
   groundHeight: 0.05
