@@ -1008,6 +1008,7 @@ MonoBehaviour:
   groundColor: {r: 0.16, g: 0.18, b: 0.22, a: 1}
   gridColor: {r: 1, g: 1, b: 1, a: 0.07}
   borderColor: {r: 0.85, g: 0.35, b: 0.25, a: 1}
+  baseMaterial: {fileID: 2100000, guid: 934cd860da56a4142bc851c159869437, type: 2}
 --- !u!4 &1065001596
 Transform:
   m_ObjectHideFlags: 0

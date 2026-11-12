@@ -16,16 +16,17 @@ public class MapBuilder : MonoBehaviour
     public Color gridColor = new Color(0.23f, 0.26f, 0.31f);
     public Color borderColor = new Color(0.85f, 0.35f, 0.25f);
 
+    [Header("Material (needed for phone builds)")]
+    [Tooltip("A Lit material from your project (Universal Render Pipeline/Lit in a URP project). Without it the map can turn pink in a build")]
+    public Material baseMaterial;
+
     public Vector2 Size => size;
 
     Material groundMat, gridMat, borderMat;
 
     void Awake()
     {
-        // Borrow the project's default material so this works in URP and Built-in alike.
-        var temp = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        Material baseMat = temp.GetComponent<Renderer>().sharedMaterial;
-        Destroy(temp);
+        Material baseMat = FindBaseMaterial();
 
         groundMat = MakeMat(baseMat, groundColor);
         gridMat = MakeMat(baseMat, gridColor);
@@ -34,6 +35,33 @@ public class MapBuilder : MonoBehaviour
         BuildGround();
         BuildGrid();
         BuildBorder();
+    }
+
+    // The material every box is copied from. An assigned material always works, because the build
+    // includes everything the scene points at. The automatic ways below work in the editor, but a phone
+    // build has nothing to borrow from, which is what makes the map pink.
+    Material FindBaseMaterial()
+    {
+        if (baseMaterial != null) return baseMaterial;
+
+        if (!Application.isEditor)
+            Debug.LogWarning("MapBuilder has no Base Material assigned, so the map may be pink in this build. " +
+                             "Create a material that uses Universal Render Pipeline/Lit and drag it into the Base Material slot.", this);
+
+        // The render pipeline's own default (only available in the editor).
+        var pipeline = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline;
+        if (pipeline != null && pipeline.defaultMaterial != null) return pipeline.defaultMaterial;
+
+        // Look a shader up by name (only works in a build if the shader is included in it).
+        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+        if (shader == null) shader = Shader.Find("Standard");
+        if (shader != null) return new Material(shader);
+
+        // Last resort: borrow from a primitive, like before.
+        var temp = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        Material borrowed = temp.GetComponent<Renderer>().sharedMaterial;
+        Destroy(temp);
+        return borrowed;
     }
 
     void BuildGround()

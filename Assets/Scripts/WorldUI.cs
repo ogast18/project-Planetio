@@ -7,6 +7,7 @@ using UnityEngine.UI;
 // Everything is drawn behind your sticks and never blocks touches.
 // Built to be cheap on phones: bars and numbers live on separate sub-canvases (so moving numbers
 // never force the bars to rebuild), numbers are pooled, and values are only written when they change.
+// Hits on the same target that land close together (shotgun pellets, minigun bursts) add up into ONE number.
 public class WorldUI : MonoBehaviour
 {
     static WorldUI instance;
@@ -39,6 +40,8 @@ public class WorldUI : MonoBehaviour
     public float riseDistance = 70f;                                // canvas units
     public Color damageToEnemyColor = new Color(1f, 0.92f, 0.3f);   // yellow
     public Color damageToAllyColor = new Color(1f, 0.45f, 0.25f);   // orange-red
+    [Min(0f), Tooltip("Hits on the same target within this many seconds of a number appearing are added to that number instead of making a new one. 0 = every hit gets its own number")]
+    public float mergeWindow = 0.25f;
 
     class Bar
     {
@@ -57,6 +60,7 @@ public class WorldUI : MonoBehaviour
         public float startOffset;
         public float xJitter;
         public float age;
+        public float total;        // damage added up in this number
         public RectTransform rect;
         public Text text;
     }
@@ -118,6 +122,22 @@ public class WorldUI : MonoBehaviour
     {
         if (h == null) return;
 
+        // A fresh number on the same target? Add to it instead of stacking another one on top.
+        // (8 shotgun pellets land together and read as one number.)
+        if (mergeWindow > 0f)
+        {
+            for (int i = floats.Count - 1; i >= 0; i--)
+            {
+                Floating existing = floats[i];
+                if (existing.owner == h && existing.age < mergeWindow)
+                {
+                    existing.total += amount;
+                    SetText(existing);
+                    return;
+                }
+            }
+        }
+
         Floating f = pool.Count > 0 ? pool.Pop() : CreateFloating();
 
         f.owner = h;
@@ -125,13 +145,20 @@ public class WorldUI : MonoBehaviour
         f.startOffset = h.barOffset + 32f;               // starts just above the health bar
         f.xJitter = Random.Range(-18f, 18f);             // so numbers from fast hits don't sit exactly on top of each other
         f.age = 0f;
+        f.total = amount;
 
-        f.text.text = "-" + (amount >= 1f ? Mathf.RoundToInt(amount).ToString() : amount.ToString("0.#"));
+        SetText(f);
         f.text.color = h.team == Team.Enemy ? damageToEnemyColor : damageToAllyColor;
         f.text.canvasRenderer.SetAlpha(1f);
         f.rect.gameObject.SetActive(true);
 
         floats.Add(f);
+    }
+
+    static void SetText(Floating f)
+    {
+        float v = f.total;
+        f.text.text = "-" + (v >= 1f ? Mathf.RoundToInt(v).ToString() : v.ToString("0.#"));
     }
 
     Floating CreateFloating()
