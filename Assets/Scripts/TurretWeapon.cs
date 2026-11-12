@@ -11,7 +11,7 @@ public class TurretWeapon : MonoBehaviour
 {
     [Header("References")]
     public Transform muzzle;               // drag the Muzzle object here
-    public Projectile projectilePrefab;    // drag the Projectile prefab here
+    public Projectile projectilePrefab;    // fallback bullet: only used if the turret's stats have none
     public Material coneMaterial;          // transparent material for the cone display (optional)
     public FireButton fireButton;          // optional: found automatically if left empty
 
@@ -29,6 +29,12 @@ public class TurretWeapon : MonoBehaviour
 
     // The cone width right now (between the moving and the settled width).
     public float CurrentConeAngle { get; private set; }
+
+    // The bullet to fire: the one in the turret's stats, or this turret's own slot if the stats have none.
+    Projectile BulletPrefab =>
+        (controller != null && controller.stats != null && controller.stats.projectilePrefab != null)
+            ? controller.stats.projectilePrefab
+            : projectilePrefab;
 
     TurretController controller;
     TurretStats.Resolved s;                // this frame's stats (level applied)
@@ -57,7 +63,7 @@ public class TurretWeapon : MonoBehaviour
 
         s = controller.Current;
         CurrentConeAngle = s.coneAngle;
-        ProjectilePool.Prewarm(projectilePrefab, prewarm);
+        ProjectilePool.Prewarm(BulletPrefab, prewarm);
         RefreshCone();
     }
 
@@ -188,7 +194,7 @@ public class TurretWeapon : MonoBehaviour
 
     void Fire()
     {
-        if (projectilePrefab == null || muzzle == null) return;
+        if (BulletPrefab == null || muzzle == null) return;
 
         // One bullet for most turrets, several pellets for a shotgun. Each flies at its own random angle.
         int pellets = Mathf.Max(1, s.pelletsPerShot);
@@ -208,8 +214,8 @@ public class TurretWeapon : MonoBehaviour
         float toMuzzle = Vector3.Distance(origin, new Vector3(spawn.x, origin.y, spawn.z));
         if (SolidAhead(origin, dir, toMuzzle + 0.2f)) spawn = origin;
 
-        Projectile p = ProjectilePool.Get(projectilePrefab, spawn, Quaternion.LookRotation(dir));
-        p.Launch(dir, s.projectileSpeed, s.damage, s.range, team, body, s.knockback, null, s.armorPenetration, s.damageFalloff);
+        Projectile p = ProjectilePool.Get(BulletPrefab, spawn, Quaternion.LookRotation(dir));
+        p.Launch(dir, s.projectileSpeed, s.damage, s.range, team, body, s.knockback, null, s.armorPenetration, s.damageFalloff, s.projectileSize);
     }
 
     // ---- Cone display ------------------------------------------------------

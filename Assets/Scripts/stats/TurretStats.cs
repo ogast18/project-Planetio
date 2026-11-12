@@ -20,6 +20,12 @@ public class TurretStats : ScriptableObject
     public int pelletsPerShot = 1;
     [Tooltip("Damage multiplier along a bullet's flight. X: 0 = at the muzzle, 1 = at the end of its range. Y: 1 = full damage. Flat at 1 = no falloff; a shotgun slopes down")]
     public AnimationCurve damageFalloff = AnimationCurve.Constant(0f, 1f, 1f);
+
+    [Header("Bullet")]
+    [Tooltip("The bullet object this weapon fires: its shape, color and trail. Empty = use the one on the turret object")]
+    public Projectile projectilePrefab;
+    [Min(0.1f), Tooltip("Bullet size. Scales the bullet and the width it hits with. 1 = the prefab's own size")]
+    public float projectileSize = 1f;
     [Min(1)] public float turnSpeed = 270f;            // degrees per second
     [Min(0), Tooltip("Push on hit: starting shove speed in units/sec. 0 = no knockback (minigun, flamethrower)")]
     public float knockback = 0f;
@@ -67,6 +73,7 @@ public class TurretStats : ScriptableObject
                      spreadAmount, stationaryConeMultiplier, stationarySpeed, settleTime, loosenTime,
                      knockback;
         public int pelletsPerShot;
+        public float projectileSize;
         public AnimationCurve damageFalloff;
     }
 
@@ -90,7 +97,8 @@ public class TurretStats : ScriptableObject
             loosenTime = loosenTime,
             knockback = knockback,
             pelletsPerShot = pelletsPerShot,
-            damageFalloff = damageFalloff
+            damageFalloff = damageFalloff,
+            projectileSize = projectileSize
         };
 
         foreach (var m in milestones)

@@ -308,7 +308,7 @@ public class EnemyController : MonoBehaviour
         Vector3 spawn = center + dir * (bodyRadius + 0.2f);
 
         Projectile p = ProjectilePool.Get(stats.projectilePrefab, spawn, Quaternion.LookRotation(dir));
-        p.Launch(dir, s.projectileSpeed, s.damage, distance + 4f, MyTeam, rb, 0f, reportHit);
+        p.Launch(dir, s.projectileSpeed, s.damage, distance + 4f, MyTeam, rb, 0f, reportHit, 0f, null, s.projectileSize);
     }
 
     // Kamikaze: damages everything of the other team inside the blast, then dies.

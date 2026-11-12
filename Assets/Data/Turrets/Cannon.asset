@@ -43,6 +43,8 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  projectilePrefab: {fileID: 1608362130225858055, guid: 68fc51dc7ea02c042a55d0b54c467447, type: 3}
+  projectileSize: 1
   turnSpeed: 270
   knockback: 3
   spreadAmount: 0.5

@@ -46,6 +46,8 @@ public class EnemyStats : ScriptableObject
     [Min(1)] public float projectileSpeed = 8f;   // slow bullets can be dodged
     [Range(0f, 90f), Tooltip("Total width of the random spread, in degrees. 0 = always straight at the target")]
     public float projectileSpread = 5f;
+    [Min(0.1f), Tooltip("Bullet size. Scales the bullet and the width it hits with. 1 = the prefab's own size")]
+    public float projectileSize = 1f;
 
     [Header("Kamikaze only")]
     [Min(0.1f)] public float explosionRadius = 2.5f;   // everything of the other team inside this takes 'damage'
@@ -55,7 +57,7 @@ public class EnemyStats : ScriptableObject
     {
         public AttackType attackType;
         public float maxHealth, armorPercent, knockbackResistance, speed, turnSpeed, riskAversion, chaseRange, loseRange,
-                     damage, attackInterval, attackRange, projectileSpeed, projectileSpread, explosionRadius;
+                     damage, attackInterval, attackRange, projectileSpeed, projectileSpread, projectileSize, explosionRadius;
     }
 
     // healthMultiplier / damageMultiplier: how much stronger this enemy is than the base asset
@@ -78,6 +80,7 @@ public class EnemyStats : ScriptableObject
             attackRange = attackRange,
             projectileSpeed = projectileSpeed,
             projectileSpread = projectileSpread,
+            projectileSize = projectileSize,
             explosionRadius = explosionRadius
         };
     }

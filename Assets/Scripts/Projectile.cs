@@ -15,6 +15,12 @@ public class Projectile : MonoBehaviour
     float armorPenetration;        // fraction of the target's armor this bullet ignores (0 to 1)
     AnimationCurve damageFalloff;  // damage multiplier along the flight (null = full damage all the way)
     float totalRange;              // how far it can fly, to turn distance travelled into 0..1 for the curve
+
+    // The prefab's own size, so every launch can scale from it (a reused bullet may have had another size last time).
+    Vector3 baseScale;
+    float baseRadius;
+    float[] baseTrailWidth;
+    float hitRadius;               // how fat it is for hit detection right now (radius x size)
     System.Action<float, Vector3> onDamageDealt;   // told (damage, where it was fired from) when it hurts something
     Vector3 launchPosition;
     float remainingDistance;
@@ -30,6 +36,12 @@ public class Projectile : MonoBehaviour
     void Awake()
     {
         trails = GetComponentsInChildren<TrailRenderer>(true);
+
+        baseScale = transform.localScale;
+        baseRadius = radius;
+        hitRadius = radius;
+        baseTrailWidth = new float[trails.Length];
+        for (int i = 0; i < trails.Length; i++) baseTrailWidth[i] = trails[i].widthMultiplier;
     }
 
     // The pool calls this every time the bullet is handed out, so a reused bullet starts clean.
@@ -62,11 +74,17 @@ public class Projectile : MonoBehaviour
 
     public void Launch(Vector3 dir, float speed, float damage, float range, Team ownerTeam, Rigidbody ignoreBody = null, float knockback = 0f,
                        System.Action<float, Vector3> onDamageDealt = null, float armorPenetration = 0f,
-                       AnimationCurve damageFalloff = null)
+                       AnimationCurve damageFalloff = null, float size = 1f)
     {
         this.onDamageDealt = onDamageDealt;
         this.armorPenetration = armorPenetration;
         this.damageFalloff = damageFalloff;
+
+        // Size: scales the look, the trail and how wide it hits. Always from the prefab's own size.
+        float scale = Mathf.Max(0.05f, size);
+        transform.localScale = baseScale * scale;
+        hitRadius = baseRadius * scale;
+        for (int i = 0; i < trails.Length; i++) trails[i].widthMultiplier = baseTrailWidth[i] * scale;
         launchPosition = transform.position;
         direction = dir.normalized;
         this.speed = speed;
@@ -90,7 +108,7 @@ public class Projectile : MonoBehaviour
 
         float step = speed * Time.deltaTime;
 
-        if (Physics.SphereCast(transform.position, radius, direction, out RaycastHit hit, step,
+        if (Physics.SphereCast(transform.position, hitRadius, direction, out RaycastHit hit, step,
                                ~0, QueryTriggerInteraction.Ignore))
         {
             if (ignoreBody == null || hit.collider.attachedRigidbody != ignoreBody)
@@ -120,7 +138,7 @@ public class Projectile : MonoBehaviour
     // True if the bullet was already touching something when it appeared (and was used up by it).
     bool HitSomethingAtStart()
     {
-        int n = Physics.OverlapSphereNonAlloc(transform.position, radius, overlapBuffer, ~0,
+        int n = Physics.OverlapSphereNonAlloc(transform.position, hitRadius, overlapBuffer, ~0,
                                               QueryTriggerInteraction.Ignore);
         Health target = null;
         bool blocked = false;
