@@ -38,6 +38,12 @@ public class HullStats : ScriptableObject
         new Milestone { level = 30, speedMultiplier = 1.1f, turnSpeedMultiplier = 1.1f },
     };
 
+    [Header("Look & movement type")]
+    public HullMovementType movementType;
+    [Tooltip("One entry per design. The entry with the highest From Level that is still <= the hull level is used (e.g. 1, 10, 20, 30)")]
+    public HullVisualStage[] visualStages;
+    public GameObject GetVisualPrefab(int level) => HullVisualLookup.Pick(visualStages, level);
+
     [Serializable]
     public class Milestone
     {

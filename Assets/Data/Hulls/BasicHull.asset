@@ -63,3 +63,7 @@ MonoBehaviour:
     speedMultiplier: 1.1
     accelerationMultiplier: 1
     turnSpeedMultiplier: 1.1
+  movementType: 0
+  visualStages:
+  - fromLevel: 1
+    visualPrefab: {fileID: 4944829732331297021, guid: c5e3a5daf62940a4681596f200650eb7, type: 3}
