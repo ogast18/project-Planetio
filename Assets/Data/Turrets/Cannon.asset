@@ -76,6 +76,13 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  visualStages:
+  - fromLevel: 1
+    visualPrefab: {fileID: 3960064488319794472, guid: 49d333126ab7f8b4d9011cb5df85b41d, type: 3}
+  - fromLevel: 0
+    visualPrefab: {fileID: 0}
+  - fromLevel: 0
+    visualPrefab: {fileID: 0}
   milestones:
   - level: 10
     rangeBonus: 1

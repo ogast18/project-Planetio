@@ -2578,6 +2578,9 @@ MonoBehaviour:
   visualParent: {fileID: 0}
   turret: {fileID: 2034326824}
   hullScale: 0.5
+  groundWorldY: 0
+  heightOffset: 0
+  turretOffset: {x: 0, y: 0, z: 0}
   equipOnStart: {fileID: 11400000, guid: 917c1c1797793864a93d0351f0564b00, type: 2}
   startLevel: 1
 --- !u!1 &2034326823
@@ -2591,6 +2594,7 @@ GameObject:
   - component: {fileID: 2034326824}
   - component: {fileID: 2034326825}
   - component: {fileID: 2034326826}
+  - component: {fileID: 2034326827}
   m_Layer: 0
   m_Name: Turret
   m_TagString: Untagged
@@ -2652,6 +2656,23 @@ MonoBehaviour:
   coneSegmentAngle: 2
   showCone: 1
   groundHeight: 0.05
+--- !u!114 &2034326827
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2034326823}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0e166ad5b022f59419efdcc1b2c5332a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TurretVisualSlot
+  visualParent: {fileID: 0}
+  hideWhenModelled:
+  - {fileID: 1622540745}
+  - {fileID: 1323107527}
+  modelScale: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

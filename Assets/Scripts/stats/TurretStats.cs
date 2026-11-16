@@ -45,6 +45,11 @@ public class TurretStats : ScriptableObject
     [Tooltip("X = level (1-30), Y = damage multiplier (1 = base damage)")]
     public AnimationCurve damageMultiplier = AnimationCurve.Linear(1, 1, MaxLevel, 3);
 
+    [Header("Look")]
+    [Tooltip("One entry per turret design. The entry with the highest From Level that is still <= the turret level is used (e.g. 1, 10, 20, 30)")]
+    public HullVisualStage[] visualStages;
+    public GameObject GetVisualPrefab(int level) => HullVisualLookup.Pick(visualStages, level);
+
     [Header("Milestones (cumulative)")]
     public Milestone[] milestones =
     {

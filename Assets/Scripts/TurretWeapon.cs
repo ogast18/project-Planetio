@@ -30,6 +30,9 @@ public class TurretWeapon : MonoBehaviour
     // The cone width right now (between the moving and the settled width).
     public float CurrentConeAngle { get; private set; }
 
+    // Raised every time the turret fires a shot (for recoil, muzzle flash, sound).
+    public event System.Action Fired;
+
     // The bullet to fire: the one in the turret's stats, or this turret's own slot if the stats have none.
     Projectile BulletPrefab =>
         (controller != null && controller.stats != null && controller.stats.projectilePrefab != null)
@@ -199,6 +202,7 @@ public class TurretWeapon : MonoBehaviour
         // One bullet for most turrets, several pellets for a shotgun. Each flies at its own random angle.
         int pellets = Mathf.Max(1, s.pelletsPerShot);
         for (int i = 0; i < pellets; i++) FireOne();
+        Fired?.Invoke();
     }
 
     void FireOne()
