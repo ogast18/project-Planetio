@@ -17,6 +17,14 @@ public class HullVisualSlot : MonoBehaviour
     [Min(0.01f), Tooltip("Multiplies the hull model's size when it is spawned. 0.5 = half size")]
     [SerializeField] float hullScale = 0.5f;
 
+    [Header("Height")]
+    [Tooltip("World height of the ground. The bottom of the hull model is placed here, whatever height the vehicle object sits at")]
+    [SerializeField] float groundWorldY = 0f;
+    [Tooltip("Extra up/down shift of the hull model in metres. Negative = lower")]
+    [SerializeField] float heightOffset = 0f;
+    [Tooltip("Shift of the turret on its mount (x right, y up, z forward). Use a negative y to sit it lower")]
+    [SerializeField] Vector3 turretOffset = Vector3.zero;
+
     [Header("Start look (for testing)")]
     [SerializeField] HullStats equipOnStart;    // optional: spawn this hull's model when the scene starts
     [SerializeField, Min(1)] int startLevel = 1;
@@ -55,8 +63,18 @@ public class HullVisualSlot : MonoBehaviour
         }
     }
 
+    // Put the model's feet on the ground. The vehicle object itself may sit higher (e.g. y = 0.4 so its collider clears the floor).
+    void AlignToGround()
+    {
+        float offset = groundWorldY - vehicleRoot.position.y + heightOffset;
+        float sy = Mathf.Max(0.0001f, vehicleRoot.lossyScale.y);
+        visualParent.localPosition = new Vector3(0f, offset / sy, 0f);
+        Debug.Log($"HullVisualSlot: hull model shifted {offset:0.00} m to sit at ground height {groundWorldY:0.00}.", this);
+    }
+
     void Start()
     {
+        AlignToGround();
         if (equipOnStart != null) Equip(equipOnStart, startLevel);
         else Debug.LogWarning("HullVisualSlot: 'Equip On Start' is empty, so no hull model is spawned. Drag the hull's HullStats asset into it.", this);
     }
@@ -102,7 +120,7 @@ public class HullVisualSlot : MonoBehaviour
         if (turret && Current.TurretMount)
         {
             turret.SetParent(Current.TurretMount, true);          // true = keeps the turret's world size, even if the hull model is scaled
-            turret.localPosition = Vector3.zero;
+            turret.localPosition = turretOffset;
             turret.rotation = turretRot;                          // keep current aim direction
             if (Current.PlaceholderTurret) Current.PlaceholderTurret.SetActive(false);
         }

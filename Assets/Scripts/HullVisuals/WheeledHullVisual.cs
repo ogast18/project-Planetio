@@ -22,6 +22,14 @@ public class WheeledHullVisual : HullVisual
     [SerializeField] float wheelRadius = 0.42f;
     [SerializeField] bool invertSpin;
 
+    [Header("Debug")]
+    [Tooltip("Ignores the driving and turns the front wheels by the angle below, to check that the wheels can steer at all")]
+    [SerializeField] bool useTestSteer;
+    [SerializeField, Range(-30f, 30f)] float testSteerAngle;
+    [Tooltip("Prints the measured speed, turn rate and steering angle to the Console twice a second while driving")]
+    [SerializeField] bool debugLog;
+    float nextLog;
+
     Quaternion leftStart, rightStart;
     Vector3 leftAxis, rightAxis;
     Quaternion[] wheelStart;
@@ -82,10 +90,17 @@ public class WheeledHullVisual : HullVisual
             target = Mathf.Clamp(rad * Mathf.Rad2Deg, -maxSteerAngle, maxSteerAngle);
         }
         if (invertSteer) target = -target;
+        if (useTestSteer) target = testSteerAngle;
         steerAngle = Mathf.MoveTowards(steerAngle, target, steerSpeed * dt);
 
         if (steerPivotLeft) steerPivotLeft.localRotation = Quaternion.AngleAxis(steerAngle, leftAxis) * leftStart;
         if (steerPivotRight) steerPivotRight.localRotation = Quaternion.AngleAxis(steerAngle, rightAxis) * rightStart;
+
+        if (debugLog && Time.time >= nextLog && (Mathf.Abs(ForwardSpeed) > 0.05f || Mathf.Abs(YawRate) > 0.01f))
+        {
+            nextLog = Time.time + 0.5f;
+            Debug.Log($"Wheeled hull: speed {ForwardSpeed:0.00} m/s, turn rate {YawRate * Mathf.Rad2Deg:0} deg/s, steer angle {steerAngle:0.0} deg (target {target:0.0})", this);
+        }
 
         // spin
         float deg = ForwardSpeed / (wheelRadius * Scale) * Mathf.Rad2Deg * dt;

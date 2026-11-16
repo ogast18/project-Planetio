@@ -40,6 +40,10 @@ public abstract class HullVisual : MonoBehaviour
     public virtual void Initialize(Transform vehicleRoot)
     {
         Root = vehicleRoot;
+
+        // An Animator on the model would fight the scripts that drive the wheels.
+        foreach (Animator an in GetComponentsInChildren<Animator>(true)) an.enabled = false;
+
         rb = Root.GetComponent<Rigidbody>();
         lastPos = rb ? rb.position : Root.position;
         lastYaw = (rb ? rb.rotation : Root.rotation).eulerAngles.y;
