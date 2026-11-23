@@ -43,6 +43,8 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  projectilePrefab: {fileID: 0}
+  projectileSize: 1
   turnSpeed: 300
   knockback: 2.5
   spreadAmount: 1
@@ -74,6 +76,9 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  visualStages:
+  - fromLevel: 1
+    visualPrefab: {fileID: 2357105530167231368, guid: 02b38e67d1984ed4e9eaee0026ef587e, type: 3}
   milestones:
   - level: 10
     rangeBonus: 1

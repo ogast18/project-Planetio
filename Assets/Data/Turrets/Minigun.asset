@@ -18,6 +18,33 @@ MonoBehaviour:
   range: 12
   coneAngle: 30
   armorPenetration: 0
+  pelletsPerShot: 1
+  damageFalloff:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  projectilePrefab: {fileID: 0}
+  projectileSize: 1
   turnSpeed: 230
   knockback: 0
   spreadAmount: 0.5
@@ -49,16 +76,25 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  visualStages:
+  - fromLevel: 1
+    visualPrefab: {fileID: 8896164316794669209, guid: 235b79aae06706240a038f61b918f575, type: 3}
   milestones:
   - level: 10
     rangeBonus: 1.5
     coneAngleMultiplier: 1
     fireRateMultiplier: 1
+    armorPenetrationBonus: 0
+    pelletBonus: 0
   - level: 20
     rangeBonus: 0
     coneAngleMultiplier: 0.85
     fireRateMultiplier: 1
+    armorPenetrationBonus: 0
+    pelletBonus: 0
   - level: 30
     rangeBonus: 1.5
     coneAngleMultiplier: 0.85
     fireRateMultiplier: 1
+    armorPenetrationBonus: 0
+    pelletBonus: 0
