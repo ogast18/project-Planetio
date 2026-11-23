@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 // The cannon: fires automatically whenever an enemy is inside the firing cone and not hidden behind a wall.
@@ -30,8 +31,19 @@ public class TurretWeapon : MonoBehaviour
     // The cone width right now (between the moving and the settled width).
     public float CurrentConeAngle { get; private set; }
 
-    // Raised every time the turret fires a shot (for recoil, muzzle flash, sound).
+    // Raised every time a Projectile turret fires a shot (for recoil, muzzle flash, sound).
     public event System.Action Fired;
+
+    // Beam and Flame turrets are "firing" for as long as they are damaging things.
+    public event System.Action FiringStarted;
+    public event System.Action FiringStopped;
+    public bool IsFiring { get; private set; }
+
+    // Beam only: where the laser ends right now (nearest wall or first target), at muzzle height.
+    public Vector3 BeamEnd { get; private set; }
+
+    // The range right now, for visuals that want to fit themselves to it.
+    public float Range => s.range;
 
     // The bullet to fire: the one in the turret's stats, or this turret's own slot if the stats have none.
     Projectile BulletPrefab =>
@@ -50,6 +62,12 @@ public class TurretWeapon : MonoBehaviour
     int[] coneTris;
     int builtSegments = -1;
     readonly RaycastHit[] hitBuffer = new RaycastHit[16];
+
+    // Beam / flame state
+    float tickTimer;
+    readonly Dictionary<Health, float> ramp = new Dictionary<Health, float>();   // flame: seconds each target has been in the flames
+    readonly List<Health> inFlames = new List<Health>();
+    readonly List<Health> rampKeys = new List<Health>();
 
     void Start()
     {
@@ -75,19 +93,23 @@ public class TurretWeapon : MonoBehaviour
         s = controller.Current;            // read once per frame so Play Mode tuning is live
         UpdateConeAngle();
 
-        cooldown = Mathf.Max(0f, cooldown - Time.deltaTime);
-
-        if (cooldown <= 0f)
+        bool manual = fireButton != null && fireButton.IsHeld;
+        switch (s.fireMode)
         {
-            bool manual = fireButton != null && fireButton.IsHeld;
-            if (manual || HasTargetInCone())
-            {
-                Fire();
-                cooldown = 1f / Mathf.Max(0.01f, s.fireRate);
-            }
+            case FireMode.Beam:  UpdateBeam(manual);  break;
+            case FireMode.Flame: UpdateFlame(manual); break;
+            default:             UpdateProjectile(manual); break;
         }
 
         RefreshCone();
+    }
+
+    void SetFiring(bool firing)
+    {
+        if (firing == IsFiring) return;
+        IsFiring = firing;
+        if (firing) FiringStarted?.Invoke();
+        else FiringStopped?.Invoke();
     }
 
     void UpdateConeAngle()
@@ -166,6 +188,28 @@ public class TurretWeapon : MonoBehaviour
 
     // ---- Targeting and firing ----------------------------------------------
 
+    // True if this enemy touches the firing cone and no wall is in the way.
+    bool EnemyInCone(Health h, Vector3 origin, Vector3 forward, float half)
+    {
+        if (h.team == team || !h.IsAlive) return false;
+
+        Vector3 to = h.transform.position - transform.position;
+        to.y = 0f;
+        float dist = to.magnitude;
+        if (dist - h.radius > s.range) return false;
+
+        // Counts as inside if any part of the target (its radius) touches the cone.
+        float signed = Vector3.SignedAngle(forward, to, Vector3.up);
+        float margin = dist > 0.01f ? Mathf.Asin(Mathf.Clamp01(h.radius / dist)) * Mathf.Rad2Deg : 180f;
+        if (Mathf.Abs(signed) - margin > half) return false;
+
+        // A wall in the way means the shot could never hit, so don't fire.
+        float offset = Mathf.Clamp(signed, -half, half);
+        if (ClipDistance(origin, forward, offset) < dist - h.radius) return false;
+
+        return true;
+    }
+
     bool HasTargetInCone()
     {
         Vector3 origin = AimOrigin();
@@ -173,27 +217,146 @@ public class TurretWeapon : MonoBehaviour
         float half = CurrentConeAngle * 0.5f;
 
         foreach (Health h in Health.All)
+            if (EnemyInCone(h, origin, forward, half)) return true;
+        return false;
+    }
+
+    // ---- Projectile turrets (cannon, minigun, shotgun) ---------------------
+
+    void UpdateProjectile(bool manual)
+    {
+        SetFiring(false);
+        cooldown = Mathf.Max(0f, cooldown - Time.deltaTime);
+
+        if (cooldown <= 0f && (manual || HasTargetInCone()))
+        {
+            Fire();
+            cooldown = 1f / Mathf.Max(0.01f, s.fireRate);
+        }
+    }
+
+    // ---- Beam turret (laser) ------------------------------------------------
+
+    // A thin straight line along the turret's aim. It damages the first enemy it touches (walls stop it),
+    // a little every tick. The cone is only used to decide when to start; make it very narrow in the stats.
+    void UpdateBeam(bool manual)
+    {
+        Vector3 origin = AimOrigin();
+        Vector3 dir = FlatForward();
+
+        bool want = manual || HasTargetInCone();
+        SetFiring(want);
+        if (!want) { tickTimer = 0f; return; }
+
+        // Where the beam stops: the nearest wall, or the first enemy in front of it.
+        float stopAt = WallDistance(origin, dir, s.range);
+        Health target = null;
+        Vector3 sideDir = new Vector3(dir.z, 0f, -dir.x);
+
+        foreach (Health h in Health.All)
         {
             if (h.team == team || !h.IsAlive) continue;
 
-            Vector3 to = h.transform.position - transform.position;
+            Vector3 to = h.transform.position - origin;
             to.y = 0f;
-            float dist = to.magnitude;
-            if (dist - h.radius > s.range) continue;
+            float along = Vector3.Dot(to, dir);
+            if (along < -h.radius || along - h.radius > stopAt) continue;
 
-            // Counts as inside if any part of the target (its radius) touches the cone.
-            float signed = Vector3.SignedAngle(forward, to, Vector3.up);
-            float margin = dist > 0.01f ? Mathf.Asin(Mathf.Clamp01(h.radius / dist)) * Mathf.Rad2Deg : 180f;
-            if (Mathf.Abs(signed) - margin > half) continue;
+            float side = Mathf.Abs(Vector3.Dot(to, sideDir));
+            if (side > h.radius + s.beamWidth * 0.5f) continue;
 
-            // A wall in the way means the shot could never hit, so don't fire.
-            float offset = Mathf.Clamp(signed, -half, half);
-            if (ClipDistance(origin, forward, offset) < dist - h.radius) continue;
-
-            return true;
+            float hitDist = Mathf.Max(0f, along - h.radius);
+            if (hitDist < stopAt) { stopAt = hitDist; target = h; }
         }
-        return false;
+
+        BeamEnd = origin + dir * stopAt;
+
+        if (target == null) { tickTimer = 0f; return; }
+
+        float interval = 1f / Mathf.Max(0.1f, s.ticksPerSecond);
+        tickTimer += Time.deltaTime;
+        while (tickTimer >= interval)
+        {
+            tickTimer -= interval;
+            target.TakeDamage(s.damage * interval, dir, 0f, s.armorPenetration);
+        }
     }
+
+    // ---- Flame turret ---------------------------------------------------------
+
+    // Hurts every enemy inside the cone (walls cut it) a little every tick. The longer the same enemy
+    // stays in the flames, the more damage it takes. Everything hit is set burning.
+    void UpdateFlame(bool manual)
+    {
+        Vector3 origin = AimOrigin();
+        Vector3 forward = FlatForward();
+        float half = CurrentConeAngle * 0.5f;
+        float dt = Time.deltaTime;
+
+        bool want = manual || HasTargetInCone();
+        SetFiring(want);
+
+        // Who is in the flames this frame.
+        inFlames.Clear();
+        if (want)
+        {
+            foreach (Health h in Health.All)
+                if (EnemyInCone(h, origin, forward, half)) inFlames.Add(h);
+        }
+
+        UpdateRamp(dt);
+
+        if (!want) { tickTimer = 0f; return; }
+
+        float interval = 1f / Mathf.Max(0.1f, s.ticksPerSecond);
+        tickTimer += dt;
+        while (tickTimer >= interval)
+        {
+            tickTimer -= interval;
+            ApplyFlameTick(interval, forward);
+        }
+    }
+
+    // Targets in the flames build up their bonus, the others lose it.
+    void UpdateRamp(float dt)
+    {
+        foreach (Health h in inFlames)
+        {
+            ramp.TryGetValue(h, out float t);
+            ramp[h] = Mathf.Min(s.rampTime, t + dt);
+        }
+
+        rampKeys.Clear();
+        rampKeys.AddRange(ramp.Keys);
+        float fade = dt * s.rampTime / Mathf.Max(0.01f, s.rampDecayTime);
+        foreach (Health h in rampKeys)
+        {
+            if (h == null || !h.IsAlive) { ramp.Remove(h); continue; }
+            if (inFlames.Contains(h)) continue;
+
+            float t = ramp[h] - fade;
+            if (t <= 0f) ramp.Remove(h);
+            else ramp[h] = t;
+        }
+    }
+
+    void ApplyFlameTick(float interval, Vector3 forward)
+    {
+        foreach (Health h in inFlames)
+        {
+            ramp.TryGetValue(h, out float t);
+            float rampMultiplier = Mathf.Lerp(1f, s.rampMaxMultiplier, Mathf.Clamp01(t / Mathf.Max(0.01f, s.rampTime)));
+
+            h.TakeDamage(s.damage * interval * rampMultiplier * FlameArmorMultiplier(h), forward, 0f, s.armorPenetration);
+
+            if (s.burnDamageFraction > 0f && s.burnDuration > 0f)
+                BurnEffect.Apply(h, s.damage * s.burnDamageFraction, s.burnDuration);
+        }
+    }
+
+    // Reserved for later: low-armor enemies should burn more easily (take more flame damage) and
+    // high-armor enemies less. For now every target takes the normal amount.
+    float FlameArmorMultiplier(Health target) { return 1f; }
 
     void Fire()
     {

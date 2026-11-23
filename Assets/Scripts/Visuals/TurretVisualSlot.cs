@@ -59,7 +59,7 @@ public class TurretVisualSlot : MonoBehaviour
 
         if (Current != null)
         {
-            if (weapon) weapon.Fired -= Current.OnFire;
+            if (weapon) Unsubscribe(Current);
             Current.OnUnequip();
             Destroy(Current.gameObject);
             Current = null;
@@ -84,6 +84,8 @@ public class TurretVisualSlot : MonoBehaviour
             if (visual.Muzzle) weapon.muzzle = visual.Muzzle;
             else Debug.LogWarning($"{prefab.name}: TurretVisual has no Muzzle assigned, so bullets still leave from the old one.", prefab);
             weapon.Fired += visual.OnFire;
+            weapon.FiringStarted += visual.OnFireStart;
+            weapon.FiringStopped += visual.OnFireStop;
         }
 
         foreach (GameObject g in hideWhenModelled)
@@ -92,8 +94,15 @@ public class TurretVisualSlot : MonoBehaviour
         Current = visual;
     }
 
+    void Unsubscribe(TurretVisual visual)
+    {
+        weapon.Fired -= visual.OnFire;
+        weapon.FiringStarted -= visual.OnFireStart;
+        weapon.FiringStopped -= visual.OnFireStop;
+    }
+
     void OnDestroy()
     {
-        if (weapon && Current != null) weapon.Fired -= Current.OnFire;
+        if (weapon && Current != null) Unsubscribe(Current);
     }
 }

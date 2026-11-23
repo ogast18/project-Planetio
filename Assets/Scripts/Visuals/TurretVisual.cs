@@ -29,6 +29,7 @@ public class TurretVisual : MonoBehaviour
     public float ModelYaw => modelYaw;
 
     protected Transform Root { get; private set; }   // the Turret object (the part that aims)
+    protected TurretWeapon Weapon { get; private set; }   // the weapon on that object (for beam / flame looks)
 
     Vector3 restLocalPos, recoilAxisLocal;
     float localDistance, recoil01;
@@ -37,6 +38,7 @@ public class TurretVisual : MonoBehaviour
     public virtual void Initialize(Transform turretRoot)
     {
         Root = turretRoot;
+        Weapon = turretRoot.GetComponent<TurretWeapon>();
 
         // An Animator on the model would fight the scripts that move its parts.
         foreach (Animator an in GetComponentsInChildren<Animator>(true)) an.enabled = false;
@@ -61,6 +63,10 @@ public class TurretVisual : MonoBehaviour
         recoil01 = 1f;
         if (muzzleFlash) muzzleFlash.Play();
     }
+
+    /// <summary>Beam and flame turrets: called when the weapon starts and stops damaging things.</summary>
+    public virtual void OnFireStart() { }
+    public virtual void OnFireStop() { }
 
     public virtual void OnUnequip() { }
 

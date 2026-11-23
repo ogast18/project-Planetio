@@ -2,13 +2,21 @@ using System;
 using UnityEngine;
 using UnityEngine.Serialization;
 
+/// <summary>How a turret deals its damage.</summary>
+public enum FireMode
+{
+    Projectile,   // bullets: cannon, minigun, shotgun
+    Beam,         // laser: a thin line that damages the first target over time
+    Flame         // flamethrower: hurts everything in the cone over time and sets it burning
+}
+
 [CreateAssetMenu(fileName = "NewTurret", menuName = "Planetio/Turret Stats")]
 public class TurretStats : ScriptableObject
 {
     public const int MaxLevel = 30;
 
     [Header("Base stats (level 1)")]
-    [Min(0), Tooltip("Damage per bullet (for a shotgun: per pellet)")]
+    [Min(0), Tooltip("Damage per bullet (for a shotgun: per pellet). For Beam and Flame turrets: damage per SECOND")]
     public float baseDamage = 25f;
     [FormerlySerializedAs("shotsPerSecond"), Min(0.1f)] public float fireRate = 1.5f;   // shots per second
     [FormerlySerializedAs("bulletSpeed"), Min(1)] public float projectileSpeed = 18f;  // units per second
@@ -45,6 +53,28 @@ public class TurretStats : ScriptableObject
     [Tooltip("X = level (1-30), Y = damage multiplier (1 = base damage)")]
     public AnimationCurve damageMultiplier = AnimationCurve.Linear(1, 1, MaxLevel, 3);
 
+    [Header("Fire mode")]
+    [Tooltip("Projectile = bullets (cannon, minigun, shotgun). Beam = laser. Flame = flamethrower. Beam and Flame deal damage over time")]
+    public FireMode fireMode = FireMode.Projectile;
+    [Min(1), Tooltip("Beam and Flame: how many times per second damage is applied. Each tick deals damage-per-second divided by this")]
+    public float ticksPerSecond = 4f;
+
+    [Header("Beam (laser)")]
+    [Min(0.02f), Tooltip("How wide the beam is for hitting things, in units. Thin = precise")]
+    public float beamWidth = 0.15f;
+
+    [Header("Flame")]
+    [Min(0.1f), Tooltip("Seconds on the same target to reach the full damage bonus")]
+    public float rampTime = 2f;
+    [Min(1f), Tooltip("Damage multiplier after Ramp Time seconds on one target. 1 = no ramp")]
+    public float rampMaxMultiplier = 2.5f;
+    [Min(0.1f), Tooltip("Seconds for the bonus to fade once a target leaves the flames")]
+    public float rampDecayTime = 1f;
+    [Range(0f, 2f), Tooltip("Burn damage per second as a fraction of the flame's own damage per second. 0 = no burn")]
+    public float burnDamageFraction = 0.25f;
+    [Min(0f), Tooltip("Seconds the burn keeps going after the last flame hit")]
+    public float burnDuration = 3f;
+
     [Header("Look")]
     [Tooltip("One entry per turret design. The entry with the highest From Level that is still <= the turret level is used (e.g. 1, 10, 20, 30)")]
     public HullVisualStage[] visualStages;
@@ -80,6 +110,9 @@ public class TurretStats : ScriptableObject
         public int pelletsPerShot;
         public float projectileSize;
         public AnimationCurve damageFalloff;
+        public FireMode fireMode;
+        public float ticksPerSecond, beamWidth, rampTime, rampMaxMultiplier, rampDecayTime,
+                     burnDamageFraction, burnDuration;
     }
 
     public Resolved AtLevel(int level)
@@ -103,7 +136,15 @@ public class TurretStats : ScriptableObject
             knockback = knockback,
             pelletsPerShot = pelletsPerShot,
             damageFalloff = damageFalloff,
-            projectileSize = projectileSize
+            projectileSize = projectileSize,
+            fireMode = fireMode,
+            ticksPerSecond = ticksPerSecond,
+            beamWidth = beamWidth,
+            rampTime = rampTime,
+            rampMaxMultiplier = rampMaxMultiplier,
+            rampDecayTime = rampDecayTime,
+            burnDamageFraction = burnDamageFraction,
+            burnDuration = burnDuration
         };
 
         foreach (var m in milestones)
