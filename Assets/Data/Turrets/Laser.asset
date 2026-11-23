@@ -84,7 +84,9 @@ MonoBehaviour:
   rampDecayTime: 1
   burnDamageFraction: 0.25
   burnDuration: 3
-  visualStages: []
+  visualStages:
+  - fromLevel: 1
+    visualPrefab: {fileID: 147294137432025919, guid: c5d442d48c4f77c4180f912dcb6dd78c, type: 3}
   milestones:
   - level: 10
     rangeBonus: 1.5
