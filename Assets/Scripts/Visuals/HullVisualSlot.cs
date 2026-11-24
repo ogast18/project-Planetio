@@ -25,7 +25,7 @@ public class HullVisualSlot : MonoBehaviour
     [Tooltip("Shift of the turret on its mount (x right, y up, z forward). Use a negative y to sit it lower")]
     [SerializeField] Vector3 turretOffset = Vector3.zero;
 
-    [Header("Start look (for testing)")]
+    [Header("Fallback look (only used if there is no VehicleController)")]
     [SerializeField] HullStats equipOnStart;    // optional: spawn this hull's model when the scene starts
     [SerializeField, Min(1)] int startLevel = 1;
 
@@ -33,6 +33,8 @@ public class HullVisualSlot : MonoBehaviour
     public event System.Action<HullVisual> VisualChanged;
 
     GameObject currentPrefab;
+    VehicleController vehicle;
+    bool warnedNoPrefab;
 
     void Awake()
     {
@@ -47,6 +49,8 @@ public class HullVisualSlot : MonoBehaviour
 
         Debug.Log($"HullVisualSlot: the hull model will follow '{vehicleRoot.name}' " +
                   (rb != null ? "(its Rigidbody was found)." : "(NO Rigidbody found - it may not move with the vehicle)."), this);
+
+        vehicle = vehicleRoot.GetComponent<VehicleController>();
 
         if (visualParent == null)
         {
@@ -75,8 +79,30 @@ public class HullVisualSlot : MonoBehaviour
     void Start()
     {
         AlignToGround();
+        if (vehicle != null) return;   // Update follows the vehicle's hull and level from now on
+
         if (equipOnStart != null) Equip(equipOnStart, startLevel);
-        else Debug.LogWarning("HullVisualSlot: 'Equip On Start' is empty, so no hull model is spawned. Drag the hull's HullStats asset into it.", this);
+        else Debug.LogWarning("HullVisualSlot: no VehicleController found and 'Equip On Start' is empty, so no hull model is spawned.", this);
+    }
+
+    // Checked every frame (it is cheap): when the vehicle's hull asset or level changes and the look for it is
+    // a different model, the model is swapped by itself. This is what makes the milestone designs appear.
+    void Update()
+    {
+        if (vehicle == null || vehicle.stats == null) return;
+
+        GameObject prefab = vehicle.stats.GetVisualPrefab(vehicle.level);
+        if (prefab == null)
+        {
+            if (!warnedNoPrefab)
+            {
+                warnedNoPrefab = true;
+                Debug.LogWarning($"HullVisualSlot: '{vehicle.stats.name}' has no Visual Prefab for level {vehicle.level}, so the current model stays. Add an entry to its Visual Stages (From Level 1).", vehicle.stats);
+            }
+            return;
+        }
+        warnedNoPrefab = false;
+        if (prefab != currentPrefab) Equip(prefab);
     }
 
     /// <summary>Call this when the player equips a hull or the hull level changes.</summary>
